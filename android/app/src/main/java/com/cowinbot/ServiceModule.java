@@ -2,6 +2,7 @@ package com.cowinbot;
 
 import android.app.Activity;
 import android.content.Intent;
+import android.util.Log;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -23,7 +24,8 @@ public class ServiceModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public void startService(){
+    public void startService(String mobile){
+        Log.d("Mobile Number", mobile);
         Intent serviceIntent = new Intent(getCurrentActivity(), TextMessageListenerService.class);
         serviceIntent.putExtra("inputExtra", "It is working");
         ContextCompat.startForegroundService(getCurrentActivity(), serviceIntent);

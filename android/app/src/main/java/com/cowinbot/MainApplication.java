@@ -16,7 +16,7 @@ import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
 public class MainApplication extends Application implements ReactApplication {
-    public static final String CHANNEL_ID = "exampleServiceChannel";
+    public static final String CHANNEL_ID = "textMessageListenerServiceChannel";
 
   private final ReactNativeHost mReactNativeHost =
       new ReactNativeHost(this) {
@@ -59,7 +59,7 @@ public class MainApplication extends Application implements ReactApplication {
         NotificationChannel serviceChannel = new NotificationChannel(
                 CHANNEL_ID,
                 "Example Service Channel",
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManager.IMPORTANCE_HIGH
         );
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(serviceChannel);

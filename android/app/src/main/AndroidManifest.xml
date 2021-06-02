@@ -12,6 +12,7 @@
       android:roundIcon="@mipmap/ic_launcher_round"
       android:allowBackup="false"
       android:theme="@style/AppTheme">
+      <service android:name=".TextMessageListenerService" />
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"
@@ -23,11 +24,19 @@
             <category android:name="android.intent.category.LAUNCHER" />
         </intent-filter>
       </activity>
-      <receiver android:name=".TextMessageListenerService">
-        <intent-filter android:priority="1000">
-            <action android:name="android.provider.Telephony.SMS_RECEIVED" />
-        </intent-filter>
-      </receiver>
-      <service android:name=".TextMessageListenerService" />
+<!--      <receiver android:name=".TextMessageListenerService">-->
+<!--        <intent-filter>-->
+<!--            <action android:name="android.provider.Telephony.SMS_RECEIVED" />-->
+<!--        </intent-filter>-->
+<!--      </receiver>-->
+<!--      <receiver-->
+<!--        android:name=".MySmsReceiver"-->
+<!--        android:priority="1000"-->
+<!--        android:enabled="true"-->
+<!--        android:exported="true">-->
+<!--        <intent-filter>-->
+<!--            <action android:name="android.provider.Telephony.SMS_RECEIVED"/>-->
+<!--        </intent-filter>-->
+<!--      </receiver>-->
     </application>
 </manifest>

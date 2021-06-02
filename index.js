@@ -12,7 +12,10 @@ export default class ListenMessageApp extends Component {
     const {startService, stopService} = ServiceModule;
     return (
       <View>
-        <Button title="Start Service" onPress={() => startService()} />
+        <Button
+          title="Start Service"
+          onPress={() => startService('9106132876')}
+        />
         <Button title="Stop Service" onPress={() => stopService()} />
       </View>
     );
