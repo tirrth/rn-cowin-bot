@@ -14,7 +14,7 @@ export default class ListenMessageApp extends Component {
       <View>
         <Button
           title="Start Service"
-          onPress={() => startService('9106132876')}
+          onPress={() => startService('9106132870')}
         />
         <Button title="Stop Service" onPress={() => stopService()} />
       </View>

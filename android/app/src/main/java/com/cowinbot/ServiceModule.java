@@ -28,6 +28,7 @@ public class ServiceModule extends ReactContextBaseJavaModule {
         Log.d("Mobile Number", mobile);
         Intent serviceIntent = new Intent(getCurrentActivity(), TextMessageListenerService.class);
         serviceIntent.putExtra("inputExtra", "It is working");
+        serviceIntent.putExtra("mobileNumber", mobile);
         ContextCompat.startForegroundService(getCurrentActivity(), serviceIntent);
     }
 

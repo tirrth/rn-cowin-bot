@@ -1,29 +1,5 @@
-//package com.cowinbot;
-//import android.content.Intent;
-//import android.os.Bundle;
-//import com.facebook.react.HeadlessJsTaskService;
-//import com.facebook.react.bridge.Arguments;
-//import com.facebook.react.jstasks.HeadlessJsTaskConfig;
-//import javax.annotation.Nullable;
-//
-//public class TextMessageListenerService extends HeadlessJsTaskService {
-//
-//  @Override
-//  protected @Nullable HeadlessJsTaskConfig getTaskConfig(Intent intent) {
-//    Bundle extras = intent.getExtras();
-//    if (extras != null) {
-//      return new HeadlessJsTaskConfig(
-//          "MessageListener",
-//          extras != null ? Arguments.fromBundle(extras) : null,
-//          5000, // timeout for the task
-//          true // optional: defines whether or not the task is allowed in foreground. Default is false
-//        );
-//    }
-//    return null;
-//  }
-//}
-
 package com.cowinbot;
+
 import android.annotation.TargetApi;
 import android.app.Notification;
 import android.app.PendingIntent;
@@ -34,43 +10,33 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.IBinder;
 import android.telephony.SmsMessage;
 import android.util.Log;
 import android.widget.Toast;
-
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
+import com.android.volley.DefaultRetryPolicy;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
-import com.android.volley.toolbox.StringRequest;
 import com.android.volley.toolbox.Volley;
-
+import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
-
-import java.security.InvalidKeyException;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 import java.text.SimpleDateFormat;
 import java.util.HashMap;
 import java.util.Map;
-
-import javax.crypto.Cipher;
-import javax.crypto.KeyGenerator;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.SecretKey;
 import static com.cowinbot.MainApplication.CHANNEL_ID;
 
 public class TextMessageListenerService extends Service {
   private Boolean _stop;
   private final String cowin_base_url = "https://cdn-api.co-vin.in/api";
   private String txnId;
+  private String token;
   private static final String TAG = TextMessageListenerService.class.getSimpleName();
   public static final String pdu_type = "pdus";
   private BroadcastReceiver messageReceiver;
@@ -90,7 +56,6 @@ public class TextMessageListenerService extends Service {
         // if(intent.getAction().equals(SMS_RECEIVED)){ }
         Bundle bundle = intent.getExtras();
         SmsMessage[] msgs;
-        String strMessage = "";
         String format = bundle.getString("format");
         // Retrieve the SMS message received.
         Object[] pdus = (Object[]) bundle.get(pdu_type);
@@ -109,11 +74,14 @@ public class TextMessageListenerService extends Service {
               msgs[i] = SmsMessage.createFromPdu((byte[]) pdus[i]);
             }
             // Build the message to show.
-            strMessage += "SMS from " + msgs[i].getOriginatingAddress();
-            strMessage += " :" + msgs[i].getMessageBody() + "\n";
-            // Log and display the SMS message.
-            Log.d(TAG, "onReceive: " + strMessage);
-            Toast.makeText(context, strMessage, Toast.LENGTH_LONG).show();
+            final String originatingAddress = msgs[i].getOriginatingAddress();
+            final String messageBody = msgs[i].getMessageBody();
+            if(originatingAddress.equals("JD-NHPSMS") && messageBody.contains("Your OTP to register/access CoWIN is")){
+              String otp = messageBody.split(" ")[6].substring(0, 6);
+              Log.d(TAG, "OTP is: " + otp);
+              Toast.makeText(context, ("OTP is: " + otp), Toast.LENGTH_SHORT).show();
+              confirmOTP(otp);
+            }
           }
         }
       }
@@ -132,36 +100,31 @@ public class TextMessageListenerService extends Service {
       @Override
       public void run() {
         Log.d("Check Running", "Start to Run");
-        while(!_stop){
-          try{
-            Log.d("API Calling", "Calling API...");
-//            findAvailableSlot(true, "382350");
-            generateOTP("9106132870");
-            Thread.sleep(20000);
-          }
-          catch (InterruptedException e){
-            e.printStackTrace();
-          } catch (Exception e) {
-            e.printStackTrace();
-          }
+        try {
+          generateOTP("9106132870");
+          Thread.sleep(30000);
+        } catch (InterruptedException e) {
+          e.printStackTrace();
         }
+//        while(!_stop){
+//          try{
+//            Log.d("API Calling", "Calling API...");
+//            // findAvailableSlot(true, "382350");
+//            generateOTP("9106132870");
+//            Thread.sleep(20000);
+//          }
+//          catch (InterruptedException e){
+//            e.printStackTrace();
+//          } catch (Exception e) {
+//            e.printStackTrace();
+//          }
+//        }
         stopForeground(true);
         stopSelf();
       }
     });
     thread.start();
     Log.d("Current Date", getCurrentDate());
-
-    // do heavy work on a background thread
-    // stopSelf();
-    //    Handler handler = new Handler();
-    //    final Runnable r = new Runnable() {
-    //      public void run() {
-    //        callAPI();
-    //        if(!_stop) handler.postDelayed(this, 5000);
-    //      }
-    //    };
-    //    if(!_stop) handler.postDelayed(r, 5000);
 
     return START_REDELIVER_INTENT;
   }
@@ -181,11 +144,12 @@ public class TextMessageListenerService extends Service {
 
   private void generateOTP(String mobile) {
     RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
-    final String secret = "U2FsdGVkX1/KEwnJ85xsqldOZj5kzZ1XBbEIzX51gnPjc0jzOwg7hCzjPA9Or/UxVml4du1tu4mxx7RK+L2Hdw==";
-    String url = cowin_base_url + "/v2/auth/generateMobileOTP";
+//    final String secret = "U2FsdGVkX1/KEwnJ85xsqldOZj5kzZ1XBbEIzX51gnPjc0jzOwg7hCzjPA9Or/UxVml4du1tu4mxx7RK+L2Hdw==";
+    String url = cowin_base_url + "/v2/auth/public/generateOTP";
+    Log.d("url", url);
     Map<String, String> params = new HashMap();
     params.put("mobile", mobile);
-    params.put("secret", secret);
+//    params.put("secret", secret);
     JSONObject parameters = new JSONObject(params);
     JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, parameters, new Response.Listener<JSONObject>() {
       @Override
@@ -200,33 +164,38 @@ public class TextMessageListenerService extends Service {
     }, new Response.ErrorListener() {
       @Override
       public void onErrorResponse(VolleyError error) {
-        Log.d("Error Request", "That didn't work!!"+ " Status Code: "+ error.networkResponse.statusCode);
+        Log.d("Validate OTP Error", "That didn't work!!"+ " Status Code: "+ error.networkResponse.statusCode);
       }
     });
     queue.add(jsonObjectRequest);
   }
 
-  private void confirmOTP(String txnId, String otp) throws NoSuchAlgorithmException {
+  private void confirmOTP(String otp) {
     RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
-    byte[] message = otp.getBytes();
-    MessageDigest md = MessageDigest.getInstance("SHA-256");
-    byte[] digest = md.digest(message);
-    String url = cowin_base_url + "/v2/auth/validateMobileOtp";
+    String url = cowin_base_url + "/v2/auth/public/confirmOTP";
     Map<String, String> params = new HashMap();
+    params.put("otp", DigestUtils.sha256Hex(otp));
     params.put("txnId", txnId);
-    params.put("otp", digest.toString());
     JSONObject parameters = new JSONObject(params);
     JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, parameters, new Response.Listener<JSONObject>() {
       @Override
       public void onResponse(JSONObject response) {
-        Log.d("OTP Validated", response.toString());
+        try {
+          token = response.getString("token");
+          Log.d("Access Token", response.getString("token"));
+        } catch (JSONException e) {
+          e.printStackTrace();
+        }
       }
     }, new Response.ErrorListener() {
       @Override
       public void onErrorResponse(VolleyError error) {
-        Log.d("Error Request", "That didn't work!!"+ " Status Code: "+ error.networkResponse.statusCode);
+        error.printStackTrace();
+        Log.d("Confirm OTP Error", "That didn't work!!");
       }
     });
+//    jsonObjectRequest.setRetryPolicy(new DefaultRetryPolicy(10000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
+//     jsonObjectRequest.setRetryPolicy(new DefaultRetryPolicy( 50000, 5, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
     queue.add(jsonObjectRequest);
   }
 
