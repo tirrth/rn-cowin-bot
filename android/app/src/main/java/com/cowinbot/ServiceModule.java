@@ -33,6 +33,11 @@ public class ServiceModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
+    public Boolean isServiceRunning(){
+        return !TextMessageListenerService._stop;
+    }
+
+    @ReactMethod
     public void stopService() {
         Intent serviceIntent = new Intent(getCurrentActivity(), TextMessageListenerService.class);
         getCurrentActivity().stopService(serviceIntent);

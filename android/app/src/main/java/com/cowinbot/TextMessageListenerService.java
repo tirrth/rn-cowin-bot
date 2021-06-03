@@ -17,7 +17,7 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
-import com.android.volley.DefaultRetryPolicy;
+import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
@@ -28,17 +28,19 @@ import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONException;
 import org.json.JSONObject;
 import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 import static com.cowinbot.MainApplication.CHANNEL_ID;
 
 public class TextMessageListenerService extends Service {
-  private Boolean _stop;
+  public static Boolean _stop = false;
   private final String cowin_base_url = "https://cdn-api.co-vin.in/api";
-  private String txnId;
-  private String token;
+  private String _txnId;
+  private String _token;
   private static final String TAG = TextMessageListenerService.class.getSimpleName();
-  public static final String pdu_type = "pdus";
+  private static final String pdu_type = "pdus";
   private BroadcastReceiver messageReceiver;
 
   @Override
@@ -87,7 +89,6 @@ public class TextMessageListenerService extends Service {
       }
     };
     this.registerReceiver(this.messageReceiver, intentFilter);
-    _stop = false;
   }
 
   @Override
@@ -100,25 +101,18 @@ public class TextMessageListenerService extends Service {
       @Override
       public void run() {
         Log.d("Check Running", "Start to Run");
-        try {
-          generateOTP("9106132870");
-          Thread.sleep(30000);
-        } catch (InterruptedException e) {
-          e.printStackTrace();
+        while(!_stop){
+          try{
+            Log.d("API Calling", "Calling API...");
+            findAvailableSlot(true, "382350");
+            Thread.sleep(20000);
+          }
+          catch (InterruptedException e){
+            e.printStackTrace();
+          } catch (Exception e) {
+            e.printStackTrace();
+          }
         }
-//        while(!_stop){
-//          try{
-//            Log.d("API Calling", "Calling API...");
-//            // findAvailableSlot(true, "382350");
-//            generateOTP("9106132870");
-//            Thread.sleep(20000);
-//          }
-//          catch (InterruptedException e){
-//            e.printStackTrace();
-//          } catch (Exception e) {
-//            e.printStackTrace();
-//          }
-//        }
         stopForeground(true);
         stopSelf();
       }
@@ -144,19 +138,15 @@ public class TextMessageListenerService extends Service {
 
   private void generateOTP(String mobile) {
     RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
-//    final String secret = "U2FsdGVkX1/KEwnJ85xsqldOZj5kzZ1XBbEIzX51gnPjc0jzOwg7hCzjPA9Or/UxVml4du1tu4mxx7RK+L2Hdw==";
     String url = cowin_base_url + "/v2/auth/public/generateOTP";
-    Log.d("url", url);
     Map<String, String> params = new HashMap();
     params.put("mobile", mobile);
-//    params.put("secret", secret);
     JSONObject parameters = new JSONObject(params);
     JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, parameters, new Response.Listener<JSONObject>() {
       @Override
       public void onResponse(JSONObject response) {
         try {
-          txnId = response.getString("txnId");
-          Log.d("OTP Generated", response.getString("txnId"));
+          _txnId = response.getString("txnId");
         } catch (JSONException e) {
           e.printStackTrace();
         }
@@ -175,13 +165,13 @@ public class TextMessageListenerService extends Service {
     String url = cowin_base_url + "/v2/auth/public/confirmOTP";
     Map<String, String> params = new HashMap();
     params.put("otp", DigestUtils.sha256Hex(otp));
-    params.put("txnId", txnId);
+    params.put("txnId", _txnId);
     JSONObject parameters = new JSONObject(params);
     JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, parameters, new Response.Listener<JSONObject>() {
       @Override
       public void onResponse(JSONObject response) {
         try {
-          token = response.getString("token");
+          _token = response.getString("token");
           Log.d("Access Token", response.getString("token"));
         } catch (JSONException e) {
           e.printStackTrace();
@@ -194,15 +184,13 @@ public class TextMessageListenerService extends Service {
         Log.d("Confirm OTP Error", "That didn't work!!");
       }
     });
-//    jsonObjectRequest.setRetryPolicy(new DefaultRetryPolicy(10000, DefaultRetryPolicy.DEFAULT_MAX_RETRIES, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
-//     jsonObjectRequest.setRetryPolicy(new DefaultRetryPolicy( 50000, 5, DefaultRetryPolicy.DEFAULT_BACKOFF_MULT));
     queue.add(jsonObjectRequest);
   }
 
   private void findAvailableSlot(Boolean is_pincode, String param){
-    RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
-    String url = cowin_base_url + "/v2/appointment/sessions/public/" + (is_pincode ? "calendarByPin": "calendarByDistrict");
-    url += ((is_pincode ? "?pincode=" : "?district_id=") + param) + ("&date=" + getCurrentDate());
+    String url = cowin_base_url + "/v2/appointment/sessions/";
+    url += (is_pincode ? "calendarByPin?pincode=" : "calendarByDistrict?district_id=") + param + ("&date=" + getCurrentDate());
+    Log.d("URL: ", url);
     JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
       @Override
       public void onResponse(JSONObject response) {
@@ -211,35 +199,29 @@ public class TextMessageListenerService extends Service {
     }, new Response.ErrorListener() {
       @Override
       public void onErrorResponse(VolleyError error) {
-        if(error.networkResponse.statusCode == 401)
+        // if(error.networkResponse.statusCode == 401)
         Log.d("Error Request", "That didn't work!!"+ " Status Code: "+ error.networkResponse.statusCode);
       }
     });
+//    {
+//      //This is for Headers If You Needed
+//      @Override
+//      public Map<String, String> getHeaders() throws AuthFailureError {
+//        Map<String, String> params = new HashMap<String, String>();
+//        params.put("Content-Type", "application/json; charset=UTF-8");
+//        params.put("Authorization", _token);
+//        return params;
+//      }
+//    };
+    RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
     queue.add(jsonObjectRequest);
   }
 
   private String getCurrentDate(){
-    SimpleDateFormat date = new SimpleDateFormat("dd-MM-yyyy");
-    return date.toString();
-  }
-
-  private void callAPI(){
-    RequestQueue queue = Volley.newRequestQueue(getApplicationContext());
-    String url = "http://192.168.0.103:3000/exchange-rates/latest";
-    JsonObjectRequest jsonObjectRequest = new JsonObjectRequest
-      (Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
-        @Override
-        public void onResponse(JSONObject response) {
-          Log.d("Success Request", response.toString());
-        }
-      }, new Response.ErrorListener() {
-        @Override
-        public void onErrorResponse(VolleyError error) {
-          // TODO: Handle error
-          Log.d("Error Request", "That didn't work!!");
-        }
-      });
-    queue.add(jsonObjectRequest);
+    Date date = Calendar.getInstance().getTime();
+    SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy");
+    String today = formatter.format(date);
+    return today;
   }
 
   @Override
