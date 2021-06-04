@@ -14,20 +14,6 @@ import {name as appName} from './app.json';
 import React, {useEffect, useState} from 'react';
 
 const {ServiceModule} = NativeModules;
-// export default class ListenMessageApp extends Component {
-//   render() {
-//     const {startService, stopService} = ServiceModule;
-//     return (
-//       <View>
-//         <Button
-//           title="Start Service"
-//           onPress={() => startService('9106132870')}
-//         />
-//         <Button title="Stop Service" onPress={() => stopService()} />
-//       </View>
-//     );
-//   }
-// }
 
 const requestMessagingPermission = async () => {
   try {
@@ -80,7 +66,12 @@ const ListenMessageApp = () => {
   }, []);
 
   const _startService = () => {
-    startService('9106132870');
+    startService({
+      mobile: '9106132870',
+      refresh_interval: '5',
+      pincodes: ['382350', '382345'],
+      district_ids: [],
+    });
     setServiceRunner(true);
   };
 

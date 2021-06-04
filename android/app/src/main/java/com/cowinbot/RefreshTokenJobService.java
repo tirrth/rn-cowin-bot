@@ -86,7 +86,8 @@ public class RefreshTokenJobService extends JobService {
             public void run() {
                 if (jobCancelled) return;
                 try {
-                    generateOTP("9106132870");
+                    final String mobile = jobIdentifier.getExtras().getString("mobile");
+                    generateOTP(mobile);
                     Thread.sleep(3 * 60 * 1000);
                 } catch (InterruptedException e) {
                     e.printStackTrace();
@@ -109,12 +110,14 @@ public class RefreshTokenJobService extends JobService {
                     _txnId = response.getString("txnId");
                 } catch (JSONException e) {
                     e.printStackTrace();
+                    onJobFinished();
                 }
             }
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
                 Log.d("Validate OTP Error", "That didn't work!!"+ " Status Code: "+ error.networkResponse.statusCode);
+                onJobFinished();
             }
         });
         queue.add(jsonObjectRequest);
@@ -131,26 +134,21 @@ public class RefreshTokenJobService extends JobService {
             @Override
             public void onResponse(JSONObject response) {
                 try {
-                    response.getString("token");
-                    // Set key/value pair data in SharedPreferences
                     SharedPreferences.Editor editor = getSharedPreferences("COWIN", MODE_PRIVATE).edit();
                     editor.putString("token", response.getString("token"));
                     editor.apply();
-
-//                  // Get key/value pair data from SharedPreferences
-//                  SharedPreferences preferences = getSharedPreferences("COWIN", MODE_PRIVATE);
-//                  final String token = preferences.getString("token", "");
                     Log.d("Access Token", response.getString("token"));
-                    onJobFinished();
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
+                onJobFinished();
             }
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
                 error.printStackTrace();
                 Log.d("Confirm OTP Error", "That didn't work!!");
+                onJobFinished();
             }
         });
         queue.add(jsonObjectRequest);
@@ -158,14 +156,22 @@ public class RefreshTokenJobService extends JobService {
 
     private void onJobFinished(){
         Log.d(TAG, "Job finished");
-        this.unregisterReceiver(this.messageReceiver);
+        unregisterBroadcastReceiver();
         jobFinished(jobIdentifier, false);
+    }
+
+    private void unregisterBroadcastReceiver(){
+        try {
+            this.unregisterReceiver(this.messageReceiver);
+        } catch (IllegalArgumentException e){
+            Log.d(TAG, "Error occurred when unregistering BroadcastReceiver");
+        }
     }
 
     @Override
     public boolean onStopJob(JobParameters params) {
         Log.d(TAG, "Job cancelled before completion");
-        this.unregisterReceiver(this.messageReceiver);
+        unregisterBroadcastReceiver();
         jobCancelled = true;
         return true;
     }

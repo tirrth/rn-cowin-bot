@@ -12,6 +12,7 @@ import com.facebook.react.ReactInstanceManager;
 import com.facebook.react.ReactNativeHost;
 import com.facebook.react.ReactPackage;
 import com.facebook.soloader.SoLoader;
+
 import java.lang.reflect.InvocationTargetException;
 import java.util.List;
 
@@ -56,11 +57,7 @@ public class MainApplication extends Application implements ReactApplication {
 
   private void createNotificationChannel() {
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-        NotificationChannel serviceChannel = new NotificationChannel(
-                CHANNEL_ID,
-                "Example Service Channel",
-                NotificationManager.IMPORTANCE_HIGH
-        );
+        NotificationChannel serviceChannel = new NotificationChannel(CHANNEL_ID, "CoWIN Bot Channel", NotificationManager.IMPORTANCE_HIGH);
         NotificationManager manager = getSystemService(NotificationManager.class);
         manager.createNotificationChannel(serviceChannel);
     }
