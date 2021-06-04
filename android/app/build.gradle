@@ -194,6 +194,9 @@ dependencies {
 
     implementation 'commons-codec:commons-codec:1.15'
 
+    def work_version = "2.5.0"
+    implementation "androidx.work:work-runtime:$work_version"
+
     debugImplementation("com.facebook.flipper:flipper:${FLIPPER_VERSION}") {
       exclude group:'com.facebook.fbjni'
     }

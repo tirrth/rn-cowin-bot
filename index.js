@@ -68,9 +68,9 @@ const ListenMessageApp = () => {
   const _startService = () => {
     startService({
       mobile: '9106132870',
-      refresh_interval: '5',
-      pincodes: ['382350', '382345'],
-      district_ids: [],
+      refresh_interval: '3',
+      pincodes: ['382350', '382345', '380050', '380045', '382323'],
+      district_ids: ['154', '174', '158', '175', '181'],
     });
     setServiceRunner(true);
   };
