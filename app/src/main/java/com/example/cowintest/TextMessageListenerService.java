@@ -70,9 +70,11 @@ public class TextMessageListenerService extends Service {
   private static NetworkInfo activeNetworkInfo;
   private RequestQueue requestQueue;
   private WorkManager workManager;
+  private PeriodicWorkRequest workRequest;
   private BroadcastReceiver messageReceiver;
   private NotificationManagerCompat notificationManagerCompat;
   static ScheduledFuture<?> t;
+  static boolean isPreviousNetworkStatusConnected;
 
   @Override
   public void onCreate() {
@@ -108,13 +110,16 @@ public class TextMessageListenerService extends Service {
             Log.d("Connectivity Manager", "Connectivity Changed");
             ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
             activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+            final boolean isNetworkStatusConnected = isNetworkConnected() && internetIsConnected();
+            if(isNetworkStatusConnected == isPreviousNetworkStatusConnected) return;
+            isPreviousNetworkStatusConnected = isNetworkStatusConnected;
             try {
-              if (!isNetworkConnected()) {
-                sendForegroundNotification("Internet Connectivity is Gone");
-                stopBotActivity();
-              } else {
+              if (isNetworkStatusConnected) {
                 sendForegroundNotification("It is working");
                 startBotActivity();
+              } else {
+                sendForegroundNotification("Internet Connectivity is Gone");
+                stopBotActivity();
               }
             } catch (JSONException e) {
               e.printStackTrace();
@@ -143,6 +148,20 @@ public class TextMessageListenerService extends Service {
     this.registerReceiver(this.messageReceiver, intentFilter);
   }
 
+  public boolean internetIsConnected() {
+    try {
+      String command = "ping -c 1 google.com";
+      return (Runtime.getRuntime().exec(command).waitFor() == 0);
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private boolean isNetworkConnected(){
+    if(activeNetworkInfo == null) return false;
+    return activeNetworkInfo.isConnected();
+  }
+
   private class FindVaccineAvailability implements Runnable{
     private final Boolean is_pincode;
     private final String param;
@@ -163,10 +182,10 @@ public class TextMessageListenerService extends Service {
     broadcastIntent.putExtra("toastMessage", "The service has been stopped successfully");
     PendingIntent actionIntent = PendingIntent.getBroadcast(this, 0, broadcastIntent, PendingIntent.FLAG_UPDATE_CURRENT);
     Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_SERVICE_CHANNEL_ID)
-      .setSmallIcon(R.drawable.ic_android)
+      .setSmallIcon(R.drawable.ic_notification_logo)
       .setContentTitle("Foreground Service")
       .setContentText(contentText)
-      .setColor(Color.BLUE)
+      .setColor(Color.argb(1,66,133,244))
       .setPriority(NotificationCompat.PRIORITY_MAX)
       .setCategory(NotificationCompat.CATEGORY_SERVICE)
       .setContentIntent(pendingIntent)
@@ -179,7 +198,7 @@ public class TextMessageListenerService extends Service {
 
   private void sendInformationNotification(){
     Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_INFO_CHANNEL_ID)
-      .setSmallIcon(R.drawable.ic_android)
+      .setSmallIcon(R.drawable.ic_notification_logo)
       .setContentTitle("CoWIN Bot")
       .setContentText("Congratulations!! Your vaccination slot has been registered successfully.")
       .setColor(Color.BLUE)
@@ -238,7 +257,6 @@ public class TextMessageListenerService extends Service {
             final JSONArray sessions = center.getJSONArray("sessions");
             for (int j = 0; j < sessions.length(); ++j) {
               final JSONObject session = sessions.getJSONObject(j);
-              Log.d("isBotActivityRunning", "" + isBotActivityRunning());
               if (checkVaccineAvailability(session) && isBotActivityRunning()) {
                 stopBotActivity();
                 Log.d("Separator", "--------------------------------------------------------------------");
@@ -255,7 +273,7 @@ public class TextMessageListenerService extends Service {
                 parameters.put("session_id", sessionId);
                 parameters.put("slot", preferredSlot);
                 parameters.put("beneficiaries", beneficiaries);
-                // bookSlot(parameters);
+                bookSlot(parameters);
               }
             }
           }
@@ -341,7 +359,7 @@ public class TextMessageListenerService extends Service {
   public void startWorkManager() throws JSONException {
     final Data data = new Data.Builder().putString("mobile", userSharedPreferences.getString("mobile")).build();
     final Constraints constraints = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
-    PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(RefreshTokenWorkManager.class, 19, TimeUnit.MINUTES)
+    workRequest = new PeriodicWorkRequest.Builder(RefreshTokenWorkManager.class, 19, TimeUnit.MINUTES)
       .setInputData(data)
       .setConstraints(constraints)
       .addTag(WORKER_TAG_SYNC_DATA)
@@ -352,7 +370,10 @@ public class TextMessageListenerService extends Service {
   }
 
   public void stopWorkManager(){
-    workManager.cancelAllWorkByTag(WORKER_TAG_SYNC_DATA);
+    // workManager.cancelWorkById(workRequest.getId());
+    // workManager.cancelAllWorkByTag(WORKER_TAG_SYNC_DATA);
+    workManager.cancelAllWork();
+    workManager = null;
   }
 
   private void unregisterBroadcastReceiver(){
@@ -378,11 +399,6 @@ public class TextMessageListenerService extends Service {
     threadPool.shutdownNow();
   }
 
-  private boolean isNetworkConnected(){
-    if(activeNetworkInfo == null) return false;
-    return activeNetworkInfo.isConnected();
-  }
-
   private void startBotActivity() throws JSONException {
     startWorkManager();
     startThreadPool();
@@ -393,8 +409,8 @@ public class TextMessageListenerService extends Service {
   }
 
   private void stopBotActivity() {
-    Log.d("isWorkScheduled", "" + isWorkScheduled());
-    Log.d("isThreadPoolScheduled", "" + isThreadPoolScheduled());
+    // Log.d("isWorkScheduled", "" + isWorkScheduled());
+    // Log.d("isThreadPoolScheduled",  "" + isThreadPoolScheduled());
     if(isWorkScheduled()) stopWorkManager();
     if(isThreadPoolScheduled()) stopThreadPool();
   }
@@ -406,21 +422,7 @@ public class TextMessageListenerService extends Service {
 
   private boolean isWorkScheduled() {
     if(workManager == null) return false;
-    return true;
-//    ListenableFuture<List<WorkInfo>> statuses = workManager.getWorkInfosByTag(SYNC_DATA_WORK_NAME);
-//    try {
-//      boolean running = false;
-//      List<WorkInfo> workInfoList = statuses.get();
-//      for (WorkInfo workInfo : workInfoList) {
-//        WorkInfo.State state = workInfo.getState();
-//        Log.d("Work Manager State", state.toString());
-//        running = (state == WorkInfo.State.RUNNING | state == WorkInfo.State.ENQUEUED);
-//      }
-//      return running;
-//    } catch (ExecutionException | InterruptedException e) {
-//      e.printStackTrace();
-//      return false;
-//    }
+    return true; // Not the best practice, but couldn't find anything...
   }
 
   private void stopService(){
