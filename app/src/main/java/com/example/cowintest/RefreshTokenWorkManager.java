@@ -42,17 +42,16 @@ public class RefreshTokenWorkManager extends Worker {
     }
 
     private void generateOTP(String mobile) {
-        String url = cowin_base_url + "/v2/auth/public/generateOTP";
+        String url = cowin_base_url + "/v2/auth/generateMobileOTP";
         Map<String, String> params = new HashMap();
         params.put("mobile", mobile);
+        params.put("secret", "U2FsdGVkX19VJvTgYTEgcrIAfZFL0wjV7lBCWux4KQNdW5hcE6aiY/DTsagJWhoeJJhWVu0xBVXDOkIWwoqn7g==");
         JSONObject parameters = new JSONObject(params);
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, parameters, new Response.Listener<JSONObject>() {
             @Override
             public void onResponse(JSONObject response) {
                 try {
-                    SharedPreferences.Editor editor = context.getSharedPreferences("COWIN", Context.MODE_PRIVATE).edit();
-                    editor.putString("txnId", response.getString("txnId"));
-                    editor.apply();
+                    setCowinTxnId(response.getString("txnId"));
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -60,10 +59,17 @@ public class RefreshTokenWorkManager extends Worker {
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
-                Log.d("Validate OTP Error", "That didn't work!!"+ " Status Code: "+ error.networkResponse.statusCode);
+                // error.networkResponse.statusCode
+                Log.d("Validate OTP Error", "That didn't work!!");
             }
         });
         requestQueue.add(jsonObjectRequest);
+    }
+
+    private void setCowinTxnId(final String txnId) {
+        SharedPreferences.Editor editor = context.getSharedPreferences("COWIN", Context.MODE_PRIVATE).edit();
+        editor.putString("txnId", txnId);
+        editor.apply();
     }
 
     @NonNull
