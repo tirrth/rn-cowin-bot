@@ -75,6 +75,7 @@ public class TextMessageListenerService extends Service {
   private PendingIntent pendingNotifyIntent;
   private Intent broadcastNotifyIntent;
   private PendingIntent actionIntent;
+  private Notification notification;
 
   @Override
   public void onCreate() {
@@ -88,6 +89,7 @@ public class TextMessageListenerService extends Service {
     Toast.makeText(this, "Service running", Toast.LENGTH_SHORT).show();
     try {
       userSharedPreferences = new JSONObject(Objects.requireNonNull(intent.getStringExtra("preferences")));
+      initializeForegroundNotification();
       registerBroadcastReceiver();
     } catch (JSONException e) {
       e.printStackTrace();
@@ -122,14 +124,15 @@ public class TextMessageListenerService extends Service {
                 startBotActivity();
               } else {
                 stopBotActivity();
-                new java.util.Timer().schedule(
-                  new java.util.TimerTask() {
-                    @Override
-                    public void run() {
-                      sendForegroundNotification("CoWIN Bot Stopped!","No Internet Connection at the Moment", Color.argb(1,219,68,55));
-                    }
-                  }, 2000
-                );
+                sendForegroundNotification("CoWIN Bot Stopped!","No Internet Connection at the Moment", Color.argb(1,219,68,55));
+                // new java.util.Timer().schedule(
+                //   new java.util.TimerTask() {
+                //     @Override
+                //     public void run() {
+                //       sendForegroundNotification("CoWIN Bot Stopped!","No Internet Connection at the Moment", Color.argb(1,219,68,55));
+                //     }
+                //   }, 2000
+                // );
               }
             } catch (JSONException e) {
               e.printStackTrace();
@@ -146,7 +149,7 @@ public class TextMessageListenerService extends Service {
               if (originatingAddress.contains("NHPSMS") && messageBody.contains("Your OTP to register/access CoWIN is")) {
                 String otp = messageBody.split(" ")[6].substring(0, 6);
                 Log.d("MessageListenerService", "OTP is: " + otp);
-                Toast.makeText(context, ("OTP is: " + otp), Toast.LENGTH_SHORT).show();
+                // Toast.makeText(context, ("OTP is: " + otp), Toast.LENGTH_SHORT).show();
                 confirmOTP(otp);
               }
             }
@@ -187,13 +190,16 @@ public class TextMessageListenerService extends Service {
     }
   }
 
-  private void sendForegroundNotification(final String contentTitle, final String contentText, final int color){
+  private void initializeForegroundNotification(){
     notificationIntent = new Intent(this, MainActivity.class);
     pendingNotifyIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
     broadcastNotifyIntent = new Intent(this, NotificationReceiver.class);
     actionIntent = PendingIntent.getBroadcast(this, 0, broadcastNotifyIntent, PendingIntent.FLAG_UPDATE_CURRENT);
     // broadcastNotifyIntent.putExtra("toastMessage", "The service has been stopped successfully");
-    Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_SERVICE_CHANNEL_ID)
+  }
+
+  private void sendForegroundNotification(final String contentTitle, final String contentText, final int color){
+    notification = new NotificationCompat.Builder(this, NOTIFICATION_SERVICE_CHANNEL_ID)
       .setSmallIcon(R.drawable.ic_notification_logo)
       .setContentTitle(contentTitle)
       .setContentText(contentText)
