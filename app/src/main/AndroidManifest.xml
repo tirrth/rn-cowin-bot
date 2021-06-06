@@ -16,18 +16,15 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.CoWinTest">
-        <activity android:name=".VerificationActivity" android:label="Verification" />
-        <activity android:name=".MainActivity" android:label="Home" />
-        <activity android:name=".SplashActivity">
+        <!-- <activity android:name=".VerificationActivity" android:label="Verification" /> -->
+        <!-- <activity android:name=".MainActivity" android:label="Home" /> -->
+        <activity android:name=".MainActivity" android:label="Main">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
-
         <service android:name=".TextMessageListenerService" />
-
         <receiver android:name=".NotificationReceiver" />
     </application>
 
