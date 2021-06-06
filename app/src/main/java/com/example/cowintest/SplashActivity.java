@@ -18,6 +18,7 @@ public class SplashActivity extends AppCompatActivity {
         Integer[] animations = {R.raw.covid_anim_1, R.raw.covid_anim_2, R.raw.covid_anim_3, R.raw.covid_anim_4, R.raw.covid_anim_5};
         final int random_anim_id =  animations[generateRandomInteger(0, animations.length - 1)];
         Log.d("Random Anim Id", "" + random_anim_id);
+        lottieAnimationView.enableMergePathsForKitKatAndAbove(true);
         lottieAnimationView.setAnimation(random_anim_id);
         getSupportActionBar().hide();
         startActivity(new Intent(getBaseContext(), MainActivity.class));

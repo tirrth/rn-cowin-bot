@@ -24,12 +24,10 @@ import androidx.work.Data;
 import androidx.work.ExistingPeriodicWorkPolicy;
 import androidx.work.NetworkType;
 import androidx.work.PeriodicWorkRequest;
-import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
-import androidx.work.WorkRequest;
 
 import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
@@ -38,7 +36,6 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
-import com.google.common.util.concurrent.ListenableFuture;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
@@ -49,10 +46,8 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Objects;
-import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
@@ -74,7 +69,12 @@ public class TextMessageListenerService extends Service {
   private BroadcastReceiver messageReceiver;
   private NotificationManagerCompat notificationManagerCompat;
   static ScheduledFuture<?> t;
-  static boolean isPreviousNetworkStatusConnected;
+  private static String isPreviousNetworkStatusConnected;
+  private static int total_api_calls_count = 0;
+  private Intent notificationIntent;
+  private PendingIntent pendingNotifyIntent;
+  private Intent broadcastNotifyIntent;
+  private PendingIntent actionIntent;
 
   @Override
   public void onCreate() {
@@ -97,6 +97,7 @@ public class TextMessageListenerService extends Service {
   }
 
   private void registerBroadcastReceiver(){
+    isPreviousNetworkStatusConnected = "";
     final IntentFilter intentFilter = new IntentFilter();
     intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
     intentFilter.addAction(Telephony.Sms.Intents.SMS_RECEIVED_ACTION);
@@ -110,16 +111,25 @@ public class TextMessageListenerService extends Service {
             Log.d("Connectivity Manager", "Connectivity Changed");
             ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
             activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
-            final boolean isNetworkStatusConnected = isNetworkConnected() && internetIsConnected();
-            if(isNetworkStatusConnected == isPreviousNetworkStatusConnected) return;
+            final String isNetworkStatusConnected = String.valueOf(isNetworkConnected() && internetIsConnected());
+            Log.d("NetworkStatusConnected", isNetworkStatusConnected);
+            Log.d("PreviousNetwork", isPreviousNetworkStatusConnected);
+            if(isNetworkStatusConnected.equals(isPreviousNetworkStatusConnected)) return;
             isPreviousNetworkStatusConnected = isNetworkStatusConnected;
             try {
-              if (isNetworkStatusConnected) {
-                sendForegroundNotification("It is working");
+              if (Boolean.parseBoolean(isNetworkStatusConnected)) {
+                sendForegroundNotification("CoWIN Bot Running...","Count: " + total_api_calls_count + "   Refresh-Rate: 3s", Color.argb(1,66,133,244));
                 startBotActivity();
               } else {
-                sendForegroundNotification("Internet Connectivity is Gone");
                 stopBotActivity();
+                new java.util.Timer().schedule(
+                  new java.util.TimerTask() {
+                    @Override
+                    public void run() {
+                      sendForegroundNotification("CoWIN Bot Stopped!","No Internet Connection at the Moment", Color.argb(1,219,68,55));
+                    }
+                  }, 2000
+                );
               }
             } catch (JSONException e) {
               e.printStackTrace();
@@ -171,27 +181,29 @@ public class TextMessageListenerService extends Service {
     }
     @Override
     public void run() {
+      total_api_calls_count++;
+      if(isBotActivityRunning()) sendForegroundNotification("CoWIN Bot Running...","Count: " + total_api_calls_count + "   Refresh-Rate: 3s", Color.argb(1,66,133,244));
       findAvailableSlot(is_pincode, param);
     }
   }
 
-  private void sendForegroundNotification(final String contentText){
-    Intent notificationIntent = new Intent(this, MainActivity.class);
-    PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
-    Intent broadcastIntent = new Intent(this, NotificationReceiver.class);
-    broadcastIntent.putExtra("toastMessage", "The service has been stopped successfully");
-    PendingIntent actionIntent = PendingIntent.getBroadcast(this, 0, broadcastIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+  private void sendForegroundNotification(final String contentTitle, final String contentText, final int color){
+    notificationIntent = new Intent(this, MainActivity.class);
+    pendingNotifyIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
+    broadcastNotifyIntent = new Intent(this, NotificationReceiver.class);
+    actionIntent = PendingIntent.getBroadcast(this, 0, broadcastNotifyIntent, PendingIntent.FLAG_UPDATE_CURRENT);
+    // broadcastNotifyIntent.putExtra("toastMessage", "The service has been stopped successfully");
     Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_SERVICE_CHANNEL_ID)
       .setSmallIcon(R.drawable.ic_notification_logo)
-      .setContentTitle("Foreground Service")
+      .setContentTitle(contentTitle)
       .setContentText(contentText)
-      .setColor(Color.argb(1,66,133,244))
+      .setColor(color)
       .setPriority(NotificationCompat.PRIORITY_MAX)
       .setCategory(NotificationCompat.CATEGORY_SERVICE)
-      .setContentIntent(pendingIntent)
+      .setContentIntent(pendingNotifyIntent)
       .setAutoCancel(true)
       .setOnlyAlertOnce(true)
-      .addAction(R.mipmap.ic_launcher, "Stop", actionIntent)
+      .addAction(R.drawable.ic_cancel, "Stop", actionIntent)
       .build();
     startForeground(1, notification);
   }
@@ -258,9 +270,9 @@ public class TextMessageListenerService extends Service {
             for (int j = 0; j < sessions.length(); ++j) {
               final JSONObject session = sessions.getJSONObject(j);
               if (checkVaccineAvailability(session) && isBotActivityRunning()) {
-                stopBotActivity();
-                Log.d("Separator", "--------------------------------------------------------------------");
-                Log.d("This slot is Available", session.toString());
+                // stopBotActivity();
+                // Log.d("Separator", "--------------------------------------------------------------------");
+                // Log.d("This slot is Available", session.toString());
                 final String sessionId = session.getString("session_id");
                 String preferredSlot = session.getJSONArray("slots").length() > 0 ? session.getJSONArray("slots").getString(0) : "";
                 final int dose = 1;
@@ -273,7 +285,7 @@ public class TextMessageListenerService extends Service {
                 parameters.put("session_id", sessionId);
                 parameters.put("slot", preferredSlot);
                 parameters.put("beneficiaries", beneficiaries);
-                bookSlot(parameters);
+                // bookSlot(parameters);
               }
             }
           }
@@ -378,6 +390,8 @@ public class TextMessageListenerService extends Service {
 
   private void unregisterBroadcastReceiver(){
     try {
+      total_api_calls_count = 0;
+      isPreviousNetworkStatusConnected = "";
       this.unregisterReceiver(this.messageReceiver);
     } catch (IllegalArgumentException e){
       Log.d("Broadcast Listener", "Error occurred when unregistering BroadcastReceiver");
@@ -422,7 +436,7 @@ public class TextMessageListenerService extends Service {
 
   private boolean isWorkScheduled() {
     if(workManager == null) return false;
-    return true; // Not the best practice, but couldn't find anything...
+    return true; // Not the best practice, but couldn't find anything else on the internet...
   }
 
   private void stopService(){
