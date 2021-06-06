@@ -51,7 +51,7 @@ public class RefreshTokenWorkManager extends Worker {
             @Override
             public void onResponse(JSONObject response) {
                 try {
-                    setCowinTxnId(response.getString("txnId"));
+                     setCowinTxnId(response.getString("txnId"));
                 } catch (JSONException e) {
                     e.printStackTrace();
                 }
@@ -59,7 +59,6 @@ public class RefreshTokenWorkManager extends Worker {
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
-                // error.networkResponse.statusCode
                 Log.d("Validate OTP Error", "That didn't work!!");
             }
         });

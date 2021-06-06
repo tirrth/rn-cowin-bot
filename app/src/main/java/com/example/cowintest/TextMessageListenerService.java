@@ -3,10 +3,7 @@ package com.example.cowintest;
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.app.job.JobInfo;
-import android.app.job.JobScheduler;
 import android.content.BroadcastReceiver;
-import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -15,13 +12,13 @@ import android.graphics.Color;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.IBinder;
-import android.os.PersistableBundle;
 import android.provider.Telephony;
 import android.telephony.SmsMessage;
 import android.util.Log;
 import android.widget.Toast;
 
 import androidx.core.app.NotificationManagerCompat;
+import androidx.work.BackoffPolicy;
 import androidx.work.Constraints;
 import androidx.work.Data;
 import androidx.work.ExistingPeriodicWorkPolicy;
@@ -29,10 +26,10 @@ import androidx.work.NetworkType;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
-import androidx.work.WorkRequest;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.work.WorkRequest;
 
 import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
@@ -67,12 +64,12 @@ import static com.example.cowintest.MainApplication.NOTIFICATION_SERVICE_CHANNEL
 public class TextMessageListenerService extends Service {
   private final String cowin_base_url = "https://cdn-api.co-vin.in/api";
   private JSONObject userSharedPreferences = new JSONObject();
-  private final String workManagerTag = "CowinRefreshTokenWorkManager";
+  private static final String WORKER_TAG_SYNC_DATA = "CowinWorkManager";
+  private static final String SYNC_DATA_WORK_NAME = "CowinRefreshTokenWork";
   private static ScheduledExecutorService threadPool;
   private static NetworkInfo activeNetworkInfo;
   private RequestQueue requestQueue;
   private WorkManager workManager;
-  private PeriodicWorkRequest workRequest;
   private BroadcastReceiver messageReceiver;
   private NotificationManagerCompat notificationManagerCompat;
   static ScheduledFuture<?> t;
@@ -81,7 +78,6 @@ public class TextMessageListenerService extends Service {
   public void onCreate() {
     super.onCreate();
     notificationManagerCompat = NotificationManagerCompat.from(this);
-    workManager = WorkManager.getInstance(this);
     requestQueue = Volley.newRequestQueue(this);
   }
 
@@ -345,19 +341,18 @@ public class TextMessageListenerService extends Service {
   public void startWorkManager() throws JSONException {
     final Data data = new Data.Builder().putString("mobile", userSharedPreferences.getString("mobile")).build();
     final Constraints constraints = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
-    workRequest = new PeriodicWorkRequest.Builder(RefreshTokenWorkManager.class, 19, TimeUnit.MINUTES)
+    PeriodicWorkRequest workRequest = new PeriodicWorkRequest.Builder(RefreshTokenWorkManager.class, 19, TimeUnit.MINUTES)
       .setInputData(data)
       .setConstraints(constraints)
-      .addTag(workManagerTag)
-      .setInitialDelay(0, TimeUnit.MINUTES)
+      .addTag(WORKER_TAG_SYNC_DATA)
+      .setBackoffCriteria(BackoffPolicy.LINEAR, PeriodicWorkRequest.MIN_BACKOFF_MILLIS, TimeUnit.MILLISECONDS)
       .build();
-    // workManager.enqueue(workRequest);
-    workManager.enqueueUniquePeriodicWork(workManagerTag, ExistingPeriodicWorkPolicy.REPLACE, workRequest);
+    workManager = WorkManager.getInstance(this);
+    workManager.enqueueUniquePeriodicWork(SYNC_DATA_WORK_NAME, ExistingPeriodicWorkPolicy.REPLACE, workRequest);
   }
 
   public void stopWorkManager(){
-    // workManager.cancelWorkById(workRequest.getId());
-    workManager.cancelAllWorkByTag(workManagerTag);
+    workManager.cancelAllWorkByTag(WORKER_TAG_SYNC_DATA);
   }
 
   private void unregisterBroadcastReceiver(){
@@ -394,13 +389,13 @@ public class TextMessageListenerService extends Service {
   }
 
   private boolean isBotActivityRunning(){
-    return isWorkScheduled(workManagerTag) && isThreadPoolScheduled();
+    return isWorkScheduled() && isThreadPoolScheduled();
   }
 
   private void stopBotActivity() {
-    Log.d("isWorkScheduled", "" + isWorkScheduled(workManagerTag));
+    Log.d("isWorkScheduled", "" + isWorkScheduled());
     Log.d("isThreadPoolScheduled", "" + isThreadPoolScheduled());
-    if(isWorkScheduled(workManagerTag)) stopWorkManager();
+    if(isWorkScheduled()) stopWorkManager();
     if(isThreadPoolScheduled()) stopThreadPool();
   }
 
@@ -409,22 +404,23 @@ public class TextMessageListenerService extends Service {
     return !threadPool.isTerminated();
   }
 
-  private boolean isWorkScheduled(String tag) {
+  private boolean isWorkScheduled() {
     if(workManager == null) return false;
-    ListenableFuture<List<WorkInfo>> statuses = workManager.getWorkInfosByTag(tag);
-    try {
-      boolean running = false;
-      List<WorkInfo> workInfoList = statuses.get();
-      for (WorkInfo workInfo : workInfoList) {
-        WorkInfo.State state = workInfo.getState();
-        Log.d("Work Manager State", state.toString());
-        running = (state == WorkInfo.State.RUNNING | state == WorkInfo.State.ENQUEUED);
-      }
-      return running;
-    } catch (ExecutionException | InterruptedException e) {
-      e.printStackTrace();
-      return false;
-    }
+    return true;
+//    ListenableFuture<List<WorkInfo>> statuses = workManager.getWorkInfosByTag(SYNC_DATA_WORK_NAME);
+//    try {
+//      boolean running = false;
+//      List<WorkInfo> workInfoList = statuses.get();
+//      for (WorkInfo workInfo : workInfoList) {
+//        WorkInfo.State state = workInfo.getState();
+//        Log.d("Work Manager State", state.toString());
+//        running = (state == WorkInfo.State.RUNNING | state == WorkInfo.State.ENQUEUED);
+//      }
+//      return running;
+//    } catch (ExecutionException | InterruptedException e) {
+//      e.printStackTrace();
+//      return false;
+//    }
   }
 
   private void stopService(){
