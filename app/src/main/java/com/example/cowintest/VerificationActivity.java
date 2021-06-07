@@ -26,7 +26,7 @@ public class VerificationActivity extends AppCompatActivity {
         new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
             @Override
             public void run() {
-                setContentView(R.layout.loading_view);
+                // setContentView(R.layout.loading_view);
             }
         }, 3000);
     }
