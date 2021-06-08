@@ -26,6 +26,7 @@ import android.telephony.SmsMessage;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
@@ -35,6 +36,7 @@ import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
+import android.widget.ScrollView;
 
 import com.airbnb.lottie.LottieAnimationView;
 import com.android.volley.AuthFailureError;
@@ -45,7 +47,9 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.example.cowintest.adapter.RecyclerViewAdapter;
+import com.google.android.material.bottomsheet.BottomSheetDialog;
 import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
@@ -62,7 +66,6 @@ public class MainActivity extends AppCompatActivity {
     private final String cowin_base_url = "https://cdn-api.co-vin.in/api";
     private BroadcastReceiver messageReceiver;
     private RequestQueue requestQueue;
-    private String _txnId;
     private RecyclerView recyclerView;
     private RecyclerViewAdapter recyclerViewAdapter;
     LoadingDialog loadingDialog = new LoadingDialog(MainActivity.this);
@@ -102,8 +105,6 @@ public class MainActivity extends AppCompatActivity {
         JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
             @Override
             public void onResponse(JSONObject response) {
-                Log.d("Response", response.toString());
-                // response.optString("states");
                 JSONArray states = response.optJSONArray("states");
                 setContentView(R.layout.activity_verification);
                 setStateDropdown(states);
@@ -161,7 +162,6 @@ public class MainActivity extends AppCompatActivity {
         userInfo.put("mobile", mobileNumber);
         userInfo.put("state_info", _selectedState);
         setUserInfo(userInfo);
-        // setMobileNumber(mobileNumber);
         generateOTP(mobileNumber);
     }
 
@@ -295,8 +295,6 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private String getMobileNumber() {
-        // SharedPreferences preferences = getSharedPreferences("COWIN", MODE_PRIVATE);
-        // return preferences.getString("mobile", "");
         return getUserInfo().optString("mobile");
     }
 
@@ -327,12 +325,6 @@ public class MainActivity extends AppCompatActivity {
         editor.apply();
     }
 
-    private void setMobileNumber(final String token) {
-        SharedPreferences.Editor editor = getSharedPreferences("COWIN", MODE_PRIVATE).edit();
-        editor.putString("mobile", token);
-        editor.apply();
-    }
-
     private void setUserInfo(final JSONObject userInfo) {
         SharedPreferences.Editor editor = getSharedPreferences("COWIN", MODE_PRIVATE).edit();
         editor.putString("user_info", userInfo.toString());
@@ -349,14 +341,11 @@ public class MainActivity extends AppCompatActivity {
                 // setContentView(R.layout.activity_main);
                 try {
                     setContentView(R.layout.beneficiary_list);
-                    ExtendedFloatingActionButton botFab = (ExtendedFloatingActionButton)findViewById(R.id.fabButton);
-                    // Resources.Theme theme = getTheme();
-                    // Drawable resImg = getResources().getDrawable(R.drawable.floating_action_background, theme);
-                    // Log.d("resImg", resImg.toString());
-                    // botFab.setBackground(resImg);
-                    botFab.setBackgroundColor(Color.rgb(0,32,96));
-                    botFab.setPadding(50, 0, 0, 0);
-                    // botFab.setBackgroundResource(R.drawable.floating_action_background);
+//                    ExtendedFloatingActionButton botFab = (ExtendedFloatingActionButton)findViewById(R.id.fabButton);
+//                    botFab.setElevation(0);
+//                    botFab.setBackgroundColor(Color.rgb(0,32,96));
+//                    botFab.setPadding(50, 0, 0, 0);
+                    // botFab.setPadding(50, 0, 50, 0);
                     beneficiaryList = response.getJSONArray("beneficiaries");
                     setBeneficiaryRecyclerView(beneficiaryList);
                     loadingDialog.dismissDialog();
@@ -438,9 +427,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void gotoBotPreferences(View v) {
-        RelativeLayout botFabProgressBar = (RelativeLayout) findViewById(R.id.fabProgress);
-        botFabProgressBar.setVisibility(View.VISIBLE);
-        v.setVisibility(View.GONE);
+        CircularProgressIndicator botFabProgressBar = (CircularProgressIndicator) findViewById(R.id.fabProgress);
+         botFabProgressBar.setVisibility(View.VISIBLE);
+         v.setVisibility(View.GONE);
+         // setContentView(R.layout.bot_preferences);
+//        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(MainActivity.this, R.style.BottomSheetTheme);
+//        View bottomSheetView = LayoutInflater.from(getApplicationContext()).inflate(R.layout.bot_preferences_bottom_sheet, (ScrollView)findViewById(R.id.botPreferencesContainer));
+//        bottomSheetDialog.setContentView(bottomSheetView);
+//        bottomSheetDialog.show();
     }
 
     public void stopService(View v) {
@@ -449,9 +443,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void logOut(View v){
-        setCowinToken("");
+        SharedPreferences.Editor editor = getSharedPreferences("COWIN", MODE_PRIVATE).edit();
+        editor.clear().apply();
         startActivity();
-        // setContentView(R.layout.activity_verification);
-        // recreate();
     }
 }

@@ -39,19 +39,48 @@
             android:background="@color/white" />
     </LinearLayout>
 
+<!--    <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton-->
+<!--        android:id="@+id/fabButton"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:layout_centerInParent="true"-->
+<!--        android:layout_centerHorizontal="true"-->
+<!--        android:onClick="gotoBotPreferences"-->
+<!--        android:text="START THE BOT"-->
+<!--        android:textColor="@color/white"-->
+<!--        android:textStyle="bold"-->
+<!--        app:fabSize="normal"-->
+<!--        app:layout_constraintBottom_toBottomOf="parent"-->
+<!--        app:layout_constraintEnd_toEndOf="parent"-->
+<!--        android:layout_margin="20dp"-->
+<!--    />-->
+
     <RelativeLayout
         android:layout_width="155dp"
         android:layout_height="45dp"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
+        android:background="@drawable/floating_progress_bar"
+        android:gravity="center"
         android:layout_margin="20dp">
-        <RelativeLayout
-            android:visibility="gone"
-            android:id="@+id/fabProgress"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:gravity="center"
-            android:background="@drawable/floating_progress_bar">
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:orientation="vertical"
+                android:id="@+id/fabText"
+                android:onClick="gotoBotPreferences"
+                android:gravity="center">
+                <TextView
+                    android:visibility="visible"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="@color/white"
+                    android:textAllCaps="true"
+                    android:text="Start the bot"
+                    android:letterSpacing="0.06"
+                    android:textSize="15sp"
+                    android:textStyle="bold" />
+            </LinearLayout>
 <!--            <ProgressBar-->
 <!--                android:layout_gravity="center"-->
 <!--                android:innerRadius="2dp"-->
@@ -60,29 +89,30 @@
 <!--                android:layout_height="match_parent"-->
 <!--                android:indeterminateTint="@color/white"-->
 <!--            />-->
-                <com.google.android.material.progressindicator.CircularProgressIndicator
-                    android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:indeterminate="true"
-                    app:trackColor="@color/white"
-                    app:indicatorColor="#A8A8A8"
-                    app:indicatorSize="20dp"
-                    app:trackThickness="2dp"
-                />
-        </RelativeLayout>
-        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
-            android:id="@+id/fabButton"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:textColor="@color/white"
-            android:textStyle="bold"
-            android:text="START THE BOT"
-            android:elevation="0dp"
-            android:layout_centerHorizontal="true"
-            android:layout_centerInParent="true"
-            android:onClick="gotoBotPreferences"
-            app:fabSize="normal"
-        />
+            <com.google.android.material.progressindicator.CircularProgressIndicator
+                android:id="@+id/fabProgress"
+                android:visibility="gone"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:indeterminate="true"
+                app:trackColor="@color/white"
+                app:indicatorColor="#A8A8A8"
+                app:indicatorSize="20dp"
+                app:trackThickness="2dp"
+            />
+<!--        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton-->
+<!--            android:visibility="gone"-->
+<!--            android:id="@+id/fabButton"-->
+<!--            android:layout_width="match_parent"-->
+<!--            android:layout_height="match_parent"-->
+<!--            android:textColor="@color/white"-->
+<!--            android:textStyle="bold"-->
+<!--            android:text="START THE BOT"-->
+<!--            android:layout_centerHorizontal="true"-->
+<!--            android:layout_centerInParent="true"-->
+<!--            android:onClick="gotoBotPreferences"-->
+<!--            app:fabSize="normal"-->
+<!--        />-->
     </RelativeLayout>
 
 

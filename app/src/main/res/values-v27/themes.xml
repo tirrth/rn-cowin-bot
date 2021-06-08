@@ -21,5 +21,7 @@
         <item name="android:navigationBarColor">@color/white</item>
         <item name="android:windowLightNavigationBar">true</item>
         <!-- Customize your theme here. -->
+
+        <item name="bottomSheetStyle">@style/BottomSheetStyle</item>
     </style>
 </resources>
