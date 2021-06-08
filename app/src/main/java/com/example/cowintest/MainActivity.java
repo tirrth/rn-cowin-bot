@@ -1,10 +1,11 @@
 package com.example.cowintest;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.recyclerview.widget.LinearLayoutManager;
+import androidx.recyclerview.widget.RecyclerView;
 
 import android.Manifest;
 import android.content.BroadcastReceiver;
@@ -13,24 +14,27 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
+import android.content.res.Resources;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.net.ConnectivityManager;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.provider.Telephony;
 import android.telephony.SmsMessage;
-import android.telephony.TelephonyManager;
 import android.text.Editable;
 import android.text.TextWatcher;
 import android.util.Log;
 import android.view.View;
-import android.view.Window;
-import android.view.WindowManager;
+import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
-import android.widget.Toast;
+import android.widget.LinearLayout;
+import android.widget.ProgressBar;
+import android.widget.RelativeLayout;
 
 import com.airbnb.lottie.LottieAnimationView;
 import com.android.volley.AuthFailureError;
@@ -40,14 +44,17 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
+import com.example.cowintest.adapter.RecyclerViewAdapter;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.math.BigInteger;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class MainActivity extends AppCompatActivity {
@@ -56,6 +63,14 @@ public class MainActivity extends AppCompatActivity {
     private BroadcastReceiver messageReceiver;
     private RequestQueue requestQueue;
     private String _txnId;
+    private RecyclerView recyclerView;
+    private RecyclerViewAdapter recyclerViewAdapter;
+    LoadingDialog loadingDialog = new LoadingDialog(MainActivity.this);
+    JSONArray beneficiaryList = new JSONArray();
+    private AutoCompleteTextView autoCompleteStateDropdown;
+    private EditText mobileEditText;
+    Button mobileVerificationButton;
+    JSONObject _selectedState;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -68,39 +83,89 @@ public class MainActivity extends AppCompatActivity {
         Log.d("Random Anim Id", "" + random_anim_id);
         lottieAnimationView.enableMergePathsForKitKatAndAbove(true);
         lottieAnimationView.setAnimation(random_anim_id);
+        new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                startActivity();
+            }
+        }, 2000);
+    }
+
+    public void startActivity(){
         requestQueue = Volley.newRequestQueue(this);
-        if (getCowinToken() == ""){
-            new Handler(Looper.getMainLooper()).postDelayed(new Runnable() {
-                @Override
-                public void run() {
-                    setContentView(R.layout.activity_verification);
-                    requestPermissions();
-                    EditText mobileEditText = (EditText) findViewById(R.id.mobileTextInput);
-                    Button mobileVerificationButton = (Button) findViewById(R.id.mobileVerificationButton);
-                    mobileEditText.addTextChangedListener(new TextWatcher() {
-                        public void afterTextChanged(Editable s) {
-                            if(s.length() == 10) mobileVerificationButton.setEnabled(true);
-                            else mobileVerificationButton.setEnabled(false);
-                        }
-                        public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
-                        public void onTextChanged(CharSequence s, int start, int before, int count) {}
-                    });
-                }
-            }, 3000);
-        } else getBeneficiaries();
-        // SharedPreferences.Editor editor = getSharedPreferences("COWIN", MODE_PRIVATE).edit();
-        // editor.putString("token", "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiI1ZGY3YjE4MC02YTcyLTRiOTYtYWQxNy01ZmE0MjcwMTVmY2EiLCJ1c2VyX3R5cGUiOiJCRU5FRklDSUFSWSIsInVzZXJfaWQiOiI1ZGY3YjE4MC02YTcyLTRiOTYtYWQxNy01ZmE0MjcwMTVmY2EiLCJtb2JpbGVfbnVtYmVyIjo5MTA2MTMyODcwLCJiZW5lZmljaWFyeV9yZWZlcmVuY2VfaWQiOjg0NDgxNjAyOTMzNDEwLCJ0eG5JZCI6IjJmZjFlZTJlLWFkOGItNGFiMy1hNTI5LTMyYjdmMmQ4YWUzZSIsImlhdCI6MTYyMjg4NTk1NywiZXhwIjoxNjIyODg2ODU3fQ.4kN6oMT5GMK-H_tP0EW-mQS5UeDs1YijQtiS855K_YU");
-        // editor.apply();
+        if (getCowinToken() == "") getStates();
+        else getBeneficiaries();
+    }
+
+    public void getStates(){
+        String url = cowin_base_url + "/v2/admin/location/states";
+        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject response) {
+                Log.d("Response", response.toString());
+                // response.optString("states");
+                JSONArray states = response.optJSONArray("states");
+                setContentView(R.layout.activity_verification);
+                setStateDropdown(states);
+                requestPermissions();
+                mobileEditText = (EditText) findViewById(R.id.mobileTextInput);
+                mobileVerificationButton = (Button) findViewById(R.id.mobileVerificationButton);
+                mobileEditText.addTextChangedListener(new TextWatcher() {
+                    public void afterTextChanged(Editable s) {
+                        verificationActivityValidations();
+                    }
+                    public void beforeTextChanged(CharSequence s, int start, int count, int after) {}
+                    public void onTextChanged(CharSequence s, int start, int before, int count) {}
+                });
+                autoCompleteStateDropdown.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+                    @Override
+                    public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                        _selectedState = states.optJSONObject(i);
+                        verificationActivityValidations();
+                    }
+                });
+            }
+        }, new Response.ErrorListener() {
+            @Override
+            public void onErrorResponse(VolleyError error) {
+                Log.d("Error Request", "That didn't work!!");
+            }
+        });
+        requestQueue.add(jsonObjectRequest);
+    }
+
+    public void verificationActivityValidations(){
+        if(mobileEditText.getText().length() == 10 && _selectedState != null) mobileVerificationButton.setEnabled(true);
+        else mobileVerificationButton.setEnabled(false);
+    }
+
+    public void setStateDropdown(JSONArray states){
+        ArrayList<String> statesArrayList = new ArrayList<String>();
+        for(int i = 0; i < states.length(); i++){
+            statesArrayList.add(states.optJSONObject(i).optString("state_name"));
+        }
+        ArrayAdapter stateAdapter = new ArrayAdapter(this, R.layout.dropdown_state_item, statesArrayList);
+        autoCompleteStateDropdown = (AutoCompleteTextView)findViewById(R.id.autoCompleteStateTextView);
+        autoCompleteStateDropdown.setAdapter(stateAdapter);
     }
 
     public void setStatusBarColor(final int color){
         getWindow().setStatusBarColor(color);
     }
 
-    public void verifyMobileNumber(View view){
-        LoadingDialog loadingDialog = new LoadingDialog(MainActivity.this);
+    public void verifyMobileNumber(View v) throws JSONException {
         loadingDialog.startLoadingDialog();
+        registerBroadcastReceiver();
+        final String mobileNumber = mobileEditText.getText().toString();
+        JSONObject userInfo = new JSONObject();
+        userInfo.put("mobile", mobileNumber);
+        userInfo.put("state_info", _selectedState);
+        setUserInfo(userInfo);
+        // setMobileNumber(mobileNumber);
+        generateOTP(mobileNumber);
+    }
 
+    private void registerBroadcastReceiver(){
         // Initializing Broadcast Receiver
         final IntentFilter intentFilter = new IntentFilter();
         intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
@@ -121,7 +186,7 @@ public class MainActivity extends AppCompatActivity {
                             if (originatingAddress.contains("NHPSMS") && messageBody.contains("Your OTP to register/access CoWIN is")) {
                                 String otp = messageBody.split(" ")[6].substring(0, 6);
                                 Log.d("MessageListenerService", "OTP is: " + otp);
-                                Toast.makeText(context, ("OTP is: " + otp), Toast.LENGTH_SHORT).show();
+                                // Toast.makeText(context, ("OTP is: " + otp), Toast.LENGTH_SHORT).show();
                                 confirmOTP(otp);
                             }
                         }
@@ -131,8 +196,6 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         this.registerReceiver(this.messageReceiver, intentFilter);
-        EditText mobileEditText = (EditText) findViewById(R.id.mobileTextInput);
-        generateOTP(mobileEditText.getText().toString());
     }
 
     private void generateOTP(String mobile) {
@@ -171,9 +234,12 @@ public class MainActivity extends AppCompatActivity {
             public void onResponse(JSONObject response) {
                 try {
                     setCowinToken(response.getString("token"));
+                    // setContentView(R.layout.activity_main);
+                    getBeneficiaries();
                     Log.d("OTP Confirmation Token", response.getString("token"));
                 } catch (JSONException e) {
                     e.printStackTrace();
+                    loadingDialog.dismissDialog();
                 }
                 unregisterBroadcastReceiver();
             }
@@ -182,6 +248,7 @@ public class MainActivity extends AppCompatActivity {
             public void onErrorResponse(VolleyError error) {
                 error.printStackTrace();
                 Log.d("Confirm OTP Error", "That didn't work!!");
+                loadingDialog.dismissDialog();
                 unregisterBroadcastReceiver();
             }
         }){
@@ -193,34 +260,6 @@ public class MainActivity extends AppCompatActivity {
             }
         };
         requestQueue.add(jsonObjectRequest);
-    }
-
-    public void startService(View v) throws JSONException {
-        Intent serviceIntent = new Intent(this, TextMessageListenerService.class);
-        JSONArray pincodes = new JSONArray();
-        pincodes.put("382350");
-        pincodes.put("382345");
-        pincodes.put("380050");
-        pincodes.put("380045");
-        pincodes.put("382323");
-        JSONArray district_ids = new JSONArray();
-        district_ids.put("154");
-        district_ids.put("174");
-        district_ids.put("158");
-        district_ids.put("175");
-        district_ids.put("181");
-        JSONObject preferences = new JSONObject();
-        preferences.put("mobile", "9106132870");
-        preferences.put("refresh_interval", "3");
-        preferences.put("pincodes", pincodes);
-        preferences.put("district_ids", district_ids);
-        serviceIntent.putExtra("preferences", preferences.toString());
-        ContextCompat.startForegroundService(this, serviceIntent);
-    }
-
-    public void stopService(View v) {
-        Intent serviceIntent = new Intent(this, TextMessageListenerService.class);
-        stopService(serviceIntent);
     }
 
     private void requestPermissions(){
@@ -255,6 +294,22 @@ public class MainActivity extends AppCompatActivity {
         return preferences.getString("token", "");
     }
 
+    private String getMobileNumber() {
+        // SharedPreferences preferences = getSharedPreferences("COWIN", MODE_PRIVATE);
+        // return preferences.getString("mobile", "");
+        return getUserInfo().optString("mobile");
+    }
+
+    private JSONObject getUserInfo() {
+        try {
+            SharedPreferences preferences = getSharedPreferences("COWIN", MODE_PRIVATE);
+            return new JSONObject(preferences.getString("user_info", "{}"));
+        } catch (JSONException e) {
+            e.printStackTrace();
+            return new JSONObject();
+        }
+    }
+
     private String getCowinTxnId(){
         SharedPreferences preferences = getSharedPreferences("COWIN", MODE_PRIVATE);
         return preferences.getString("txnId", "");
@@ -272,6 +327,18 @@ public class MainActivity extends AppCompatActivity {
         editor.apply();
     }
 
+    private void setMobileNumber(final String token) {
+        SharedPreferences.Editor editor = getSharedPreferences("COWIN", MODE_PRIVATE).edit();
+        editor.putString("mobile", token);
+        editor.apply();
+    }
+
+    private void setUserInfo(final JSONObject userInfo) {
+        SharedPreferences.Editor editor = getSharedPreferences("COWIN", MODE_PRIVATE).edit();
+        editor.putString("user_info", userInfo.toString());
+        editor.apply();
+    }
+
     private void getBeneficiaries(){
         String url = cowin_base_url + "/v2/appointment/beneficiaries";
         final String token = getCowinToken();
@@ -279,12 +346,36 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onResponse(JSONObject response) {
                 Log.d("Response", response.toString());
-                setContentView(R.layout.activity_main);
+                // setContentView(R.layout.activity_main);
+                try {
+                    setContentView(R.layout.beneficiary_list);
+                    ExtendedFloatingActionButton botFab = (ExtendedFloatingActionButton)findViewById(R.id.fabButton);
+                    // Resources.Theme theme = getTheme();
+                    // Drawable resImg = getResources().getDrawable(R.drawable.floating_action_background, theme);
+                    // Log.d("resImg", resImg.toString());
+                    // botFab.setBackground(resImg);
+                    botFab.setBackgroundColor(Color.rgb(0,32,96));
+                    botFab.setPadding(50, 0, 0, 0);
+                    // botFab.setBackgroundResource(R.drawable.floating_action_background);
+                    beneficiaryList = response.getJSONArray("beneficiaries");
+                    setBeneficiaryRecyclerView(beneficiaryList);
+                    loadingDialog.dismissDialog();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
             }
         }, new Response.ErrorListener() {
             @Override
             public void onErrorResponse(VolleyError error) {
                 Log.d("Error Request", "That didn't work!!");
+                if(error != null &&  error.networkResponse != null && error.networkResponse.statusCode == 401) {
+                    loadingDialog.startLoadingDialog();
+                    registerBroadcastReceiver();
+                    generateOTP(getMobileNumber());
+                }
+                else{
+                    Log.d("Info", "Something went wrong..");
+                }
             }
         }){
             @Override
@@ -300,5 +391,67 @@ public class MainActivity extends AppCompatActivity {
 
     private int generateRandomInteger(int min, int max){
         return (int)Math.floor(Math.random() * (max - min + 1) + min);
+    }
+
+    private void setBeneficiaryRecyclerView(JSONArray beneficiaries) throws JSONException {
+        JSONArray newArray = new JSONArray();
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        newArray.put(beneficiaries.optJSONObject(0));
+        recyclerView = findViewById(R.id.beneficiaryRecyclerView);
+        recyclerView.setHasFixedSize(true);
+        recyclerView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerViewAdapter = new RecyclerViewAdapter(MainActivity.this, newArray);
+        recyclerView.setAdapter(recyclerViewAdapter);
+    }
+
+    public void startService(View v) throws JSONException {
+        Intent serviceIntent = new Intent(this, TextMessageListenerService.class);
+        JSONArray pincodes = new JSONArray();
+        pincodes.put("382350");
+        pincodes.put("382345");
+        pincodes.put("380050");
+        pincodes.put("380045");
+        pincodes.put("382323");
+        JSONArray district_ids = new JSONArray();
+        district_ids.put("154");
+        district_ids.put("174");
+        district_ids.put("158");
+        district_ids.put("175");
+        district_ids.put("181");
+        JSONObject preferences = new JSONObject();
+        preferences.put("mobile", "9106132870");
+        preferences.put("refresh_interval", "3");
+        preferences.put("pincodes", pincodes);
+        preferences.put("district_ids", district_ids);
+        serviceIntent.putExtra("preferences", preferences.toString());
+        ContextCompat.startForegroundService(this, serviceIntent);
+    }
+
+    public void gotoBotPreferences(View v) {
+        RelativeLayout botFabProgressBar = (RelativeLayout) findViewById(R.id.fabProgress);
+        botFabProgressBar.setVisibility(View.VISIBLE);
+        v.setVisibility(View.GONE);
+    }
+
+    public void stopService(View v) {
+        Intent serviceIntent = new Intent(this, TextMessageListenerService.class);
+        stopService(serviceIntent);
+    }
+
+    public void logOut(View v){
+        setCowinToken("");
+        startActivity();
+        // setContentView(R.layout.activity_verification);
+        // recreate();
     }
 }

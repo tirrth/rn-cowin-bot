@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:orientation="vertical"
+        app:layout_constraintTop_toTopOf="parent">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:padding="10dp"
+            android:background="#001f60">
+            <TextView
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:layout_weight="1"
+                android:textColor="#FFFFFF"
+                android:text="Health and Family Welfare"/>
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:textColor="#FFFFFF"
+                android:onClick="logOut"
+                android:text="Logout"/>
+        </LinearLayout>
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/beneficiaryRecyclerView"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingBottom="100dp"
+            android:clipToPadding="false"
+            android:background="@color/white" />
+    </LinearLayout>
+
+    <RelativeLayout
+        android:layout_width="155dp"
+        android:layout_height="45dp"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        android:layout_margin="20dp">
+        <RelativeLayout
+            android:visibility="gone"
+            android:id="@+id/fabProgress"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:background="@drawable/floating_progress_bar">
+<!--            <ProgressBar-->
+<!--                android:layout_gravity="center"-->
+<!--                android:innerRadius="2dp"-->
+<!--                style="?android:attr/progressBarStyleSmall"-->
+<!--                android:layout_width="match_parent"-->
+<!--                android:layout_height="match_parent"-->
+<!--                android:indeterminateTint="@color/white"-->
+<!--            />-->
+                <com.google.android.material.progressindicator.CircularProgressIndicator
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:indeterminate="true"
+                    app:trackColor="@color/white"
+                    app:indicatorColor="#A8A8A8"
+                    app:indicatorSize="20dp"
+                    app:trackThickness="2dp"
+                />
+        </RelativeLayout>
+        <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
+            android:id="@+id/fabButton"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:textColor="@color/white"
+            android:textStyle="bold"
+            android:text="START THE BOT"
+            android:elevation="0dp"
+            android:layout_centerHorizontal="true"
+            android:layout_centerInParent="true"
+            android:onClick="gotoBotPreferences"
+            app:fabSize="normal"
+        />
+    </RelativeLayout>
+
+
+</androidx.constraintlayout.widget.ConstraintLayout>

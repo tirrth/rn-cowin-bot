@@ -441,7 +441,7 @@ public class TextMessageListenerService extends Service {
   }
 
   private boolean isWorkScheduled() {
-    if(workManager == null) return false;
+    if (workManager == null) return false;
     return true; // Not the best practice, but couldn't find anything else on the internet...
   }
 

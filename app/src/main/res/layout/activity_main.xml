@@ -18,4 +18,10 @@
         android:layout_height="wrap_content"
         android:onClick="stopService"
         android:text="Stop Service" />
+
+    <Button
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:onClick="logOut"
+        android:text="Log Out" />
 </LinearLayout>
