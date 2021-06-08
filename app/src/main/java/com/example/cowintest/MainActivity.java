@@ -10,13 +10,12 @@ import androidx.recyclerview.widget.RecyclerView;
 import android.Manifest;
 import android.content.BroadcastReceiver;
 import android.content.Context;
+import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.pm.PackageManager;
-import android.content.res.Resources;
 import android.graphics.Color;
-import android.graphics.drawable.Drawable;
 import android.net.ConnectivityManager;
 import android.os.Bundle;
 import android.os.Handler;
@@ -33,10 +32,11 @@ import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.RelativeLayout;
-import android.widget.ScrollView;
+import android.widget.TextView;
 
 import com.airbnb.lottie.LottieAnimationView;
 import com.android.volley.AuthFailureError;
@@ -46,34 +46,47 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
-import com.example.cowintest.adapter.RecyclerViewAdapter;
+import com.example.cowintest.adapter.RecyclerViewBeneficiaryAdapter;
+import com.example.cowintest.adapter.RecyclerViewVaccinationCenterAdapter;
+import com.example.cowintest.model.VaccinationCenterModel;
 import com.google.android.material.bottomsheet.BottomSheetDialog;
-import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
+import org.w3c.dom.Text;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class MainActivity extends AppCompatActivity {
+public class MainActivity extends AppCompatActivity implements RecyclerViewVaccinationCenterAdapter.OnVaccinationCenterListener {
     private static final int PERMISSION_ALL_PERMISSION_CODE = 1;
     private final String cowin_base_url = "https://cdn-api.co-vin.in/api";
     private BroadcastReceiver messageReceiver;
     private RequestQueue requestQueue;
-    private RecyclerView recyclerView;
-    private RecyclerViewAdapter recyclerViewAdapter;
-    LoadingDialog loadingDialog = new LoadingDialog(MainActivity.this);
+    private RecyclerView recyclerBeneficiaryView;
+    private RecyclerViewBeneficiaryAdapter recyclerBeneficiaryViewAdapter;
+    private RecyclerView recyclerCenterView;
+    private RecyclerViewVaccinationCenterAdapter recyclerCenterViewAdapter;
+    CustomDialog loadingDialog = new CustomDialog(MainActivity.this, R.layout.custom_loading_dialog, false);
+    CustomDialog addDistrictDialog = new CustomDialog(MainActivity.this, R.layout.add_district_dialog, true);
     JSONArray beneficiaryList = new JSONArray();
     private AutoCompleteTextView autoCompleteStateDropdown;
+    private AutoCompleteTextView autoCompleteDistrictDropdown;
     private EditText mobileEditText;
     Button mobileVerificationButton;
     JSONObject _selectedState;
+
+    public interface VolleyCallback{
+        void onSuccess(JSONObject result);
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -145,9 +158,19 @@ public class MainActivity extends AppCompatActivity {
         for(int i = 0; i < states.length(); i++){
             statesArrayList.add(states.optJSONObject(i).optString("state_name"));
         }
-        ArrayAdapter stateAdapter = new ArrayAdapter(this, R.layout.dropdown_state_item, statesArrayList);
+        ArrayAdapter stateAdapter = new ArrayAdapter(this, R.layout.dropdown_tem, statesArrayList);
         autoCompleteStateDropdown = (AutoCompleteTextView)findViewById(R.id.autoCompleteStateTextView);
         autoCompleteStateDropdown.setAdapter(stateAdapter);
+    }
+
+    public void setDistrictDropdown(JSONArray districts){
+        ArrayList<String> statesArrayList = new ArrayList<String>();
+        for(int i = 0; i < districts.length(); i++){
+            statesArrayList.add(districts.optJSONObject(i).optString("district_name"));
+        }
+        ArrayAdapter stateAdapter = new ArrayAdapter(this, R.layout.dropdown_tem, statesArrayList);
+        autoCompleteDistrictDropdown = (AutoCompleteTextView) addDistrictDialog.customDialogView.findViewById(R.id.autoCompleteDistrictTextView);
+        autoCompleteDistrictDropdown.setAdapter(stateAdapter);
     }
 
     public void setStatusBarColor(final int color){
@@ -308,6 +331,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private JSONObject getStateInfo(){
+        return getUserInfo().optJSONObject("state_info");
+    }
+
     private String getCowinTxnId(){
         SharedPreferences preferences = getSharedPreferences("COWIN", MODE_PRIVATE);
         return preferences.getString("txnId", "");
@@ -341,11 +368,6 @@ public class MainActivity extends AppCompatActivity {
                 // setContentView(R.layout.activity_main);
                 try {
                     setContentView(R.layout.beneficiary_list);
-//                    ExtendedFloatingActionButton botFab = (ExtendedFloatingActionButton)findViewById(R.id.fabButton);
-//                    botFab.setElevation(0);
-//                    botFab.setBackgroundColor(Color.rgb(0,32,96));
-//                    botFab.setPadding(50, 0, 0, 0);
-                    // botFab.setPadding(50, 0, 50, 0);
                     beneficiaryList = response.getJSONArray("beneficiaries");
                     setBeneficiaryRecyclerView(beneficiaryList);
                     loadingDialog.dismissDialog();
@@ -396,11 +418,26 @@ public class MainActivity extends AppCompatActivity {
         newArray.put(beneficiaries.optJSONObject(0));
         newArray.put(beneficiaries.optJSONObject(0));
         newArray.put(beneficiaries.optJSONObject(0));
-        recyclerView = findViewById(R.id.beneficiaryRecyclerView);
-        recyclerView.setHasFixedSize(true);
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        recyclerViewAdapter = new RecyclerViewAdapter(MainActivity.this, newArray);
-        recyclerView.setAdapter(recyclerViewAdapter);
+        recyclerBeneficiaryView = findViewById(R.id.beneficiaryRecyclerView);
+        recyclerBeneficiaryView.setHasFixedSize(true);
+        recyclerBeneficiaryView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerBeneficiaryViewAdapter = new RecyclerViewBeneficiaryAdapter(MainActivity.this, newArray);
+        recyclerBeneficiaryView.setAdapter(recyclerBeneficiaryViewAdapter);
+    }
+
+    private void setVaccinationCenterRecyclerView(JSONArray centers) {
+        recyclerCenterView.setHasFixedSize(true);
+        recyclerCenterView.setLayoutManager(new LinearLayoutManager(this));
+        recyclerCenterViewAdapter = new RecyclerViewVaccinationCenterAdapter(getCentersList(centers), this);
+        recyclerCenterView.setAdapter(recyclerCenterViewAdapter);
+    }
+
+    public List<VaccinationCenterModel> getCentersList(JSONArray centers) {
+        ArrayList mVaccinationCentersList = new ArrayList<>();
+        for (int i = 0; i < centers.length(); i++) {
+            mVaccinationCentersList.add(new VaccinationCenterModel(centers.optJSONObject(i)));
+        }
+        return mVaccinationCentersList;
     }
 
     public void startService(View v) throws JSONException {
@@ -428,13 +465,91 @@ public class MainActivity extends AppCompatActivity {
 
     public void gotoBotPreferences(View v) {
         CircularProgressIndicator botFabProgressBar = (CircularProgressIndicator) findViewById(R.id.fabProgress);
-         botFabProgressBar.setVisibility(View.VISIBLE);
-         v.setVisibility(View.GONE);
-         // setContentView(R.layout.bot_preferences);
-//        BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(MainActivity.this, R.style.BottomSheetTheme);
-//        View bottomSheetView = LayoutInflater.from(getApplicationContext()).inflate(R.layout.bot_preferences_bottom_sheet, (ScrollView)findViewById(R.id.botPreferencesContainer));
-//        bottomSheetDialog.setContentView(bottomSheetView);
-//        bottomSheetDialog.show();
+        botFabProgressBar.setVisibility(View.VISIBLE);
+        v.setVisibility(View.GONE);
+        final String state_id = getStateInfo().optString("state_id");
+        Log.d("State Id", state_id);
+        String url = cowin_base_url + "/v2/admin/location/districts/" + state_id;
+        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject response) {
+                Log.d("District Information", response.toString());
+                // setContentView(R.layout.bot_preferences);
+                RelativeLayout fabView = (RelativeLayout) findViewById(R.id.fabView);
+                BottomSheetDialog bottomSheetDialog = new BottomSheetDialog(MainActivity.this, R.style.BottomSheetTheme);
+                View bottomSheetView = LayoutInflater.from(getApplicationContext()).inflate(R.layout.bot_preferences_bottom_sheet, (LinearLayout)findViewById(R.id.botPreferencesContainer));
+                ImageView addDistrictImageView = (ImageView) bottomSheetView.findViewById(R.id.addDistrictImageView);
+                addDistrictImageView.setOnClickListener(v1 -> onAddDistrict(response.optJSONArray("districts")));
+                bottomSheetDialog.setOnDismissListener(new DialogInterface.OnDismissListener() {
+                    @Override
+                    public void onDismiss(DialogInterface dialog) { fabView.setVisibility(View.VISIBLE); }
+                });
+                bottomSheetDialog.setContentView(bottomSheetView);
+                bottomSheetDialog.show();
+                fabView.setVisibility(View.GONE);
+                v.setVisibility(View.VISIBLE);
+                botFabProgressBar.setVisibility(View.GONE);
+            }
+        }, error -> Log.d("Error Request", "That didn't work!!"));
+        requestQueue.add(jsonObjectRequest);
+    }
+
+    public void onAddDistrict(JSONArray districts) {
+        addDistrictDialog.startLoadingDialog();
+        setDistrictDropdown(districts);
+        final TextView districtErrorMessageView = (TextView) addDistrictDialog.customDialogView.findViewById(R.id.districtDialogErrorMessageTextView);
+        final ProgressBar districtDialogResourceLoader = (ProgressBar) addDistrictDialog.customDialogView.findViewById(R.id.districtDialogResourceLoader);
+        recyclerCenterView = addDistrictDialog.customDialogView.findViewById(R.id.centerRecyclerView);
+        autoCompleteDistrictDropdown.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> adapterView, View view, int i, long l) {
+                recyclerCenterView.setVisibility(View.GONE);
+                districtErrorMessageView.setVisibility(View.GONE);
+                districtDialogResourceLoader.setVisibility(View.VISIBLE);
+                try {
+                    final String districtId = districts.getJSONObject(i).optString("district_id");
+                    // Log.d("Selected District", districts.getJSONObject(i).toString());
+                    getCenters(districtId, getTomorrowDate(), response -> {
+                        Log.d("Center Results", response.toString());
+                        setVaccinationCenterRecyclerView(response.optJSONArray("centers"));
+                        districtDialogResourceLoader.setVisibility(View.GONE);
+                        recyclerCenterView.setVisibility(View.VISIBLE);
+                    });
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+    }
+
+    public void getCenters(final String districtId, final String date, final VolleyCallback callback){
+        String url = cowin_base_url + "/v2/appointment/sessions/public/calendarByDistrict";
+        url += "?district_id=" + districtId + "&date=" + date;
+        JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
+            @Override
+            public void onResponse(JSONObject response) {
+                Log.d("District Information", response.toString());
+                callback.onSuccess(response);
+            }
+        }, error -> Log.d("Error Request", "That didn't work!!"));
+        requestQueue.add(jsonObjectRequest);
+    }
+
+    @Override
+    public void onVaccinationCenterClick(int position, VaccinationCenterModel selectedCenter) {
+        Log.d("Weelll", "Its working");
+        // Log.d("selectedCenter", selectedCenter.getAddress());
+        Log.d("selectedCenter", selectedCenter.getName());
+    }
+
+    private String getTomorrowDate(){
+        Date date = new Date();
+        Calendar c = Calendar.getInstance();
+        c.setTime(date);
+        c.add(Calendar.DATE, 1);
+        date = c.getTime();
+        SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy");
+        return formatter.format(date);
     }
 
     public void stopService(View v) {

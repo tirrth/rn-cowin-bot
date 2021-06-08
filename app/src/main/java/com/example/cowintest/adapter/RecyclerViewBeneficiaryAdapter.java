@@ -16,14 +16,14 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
-    private Context context;
+public class RecyclerViewBeneficiaryAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
+    // private Context context;
     private JSONArray beneficiaryList;
     private static final int TYPE_HEADER = 0;
     private static final int TYPE_ITEM = 1;
 
-    public RecyclerViewAdapter(Context context, JSONArray beneficiaryList){
-        this.context = context;
+    public RecyclerViewBeneficiaryAdapter(Context context, JSONArray beneficiaryList){
+        // this.context = context;
         this.beneficiaryList = beneficiaryList;
     }
 
@@ -116,9 +116,7 @@ public class RecyclerViewAdapter extends RecyclerView.Adapter<RecyclerView.ViewH
         }
 
         @Override
-        public void onClick(View view) {
-            Log.d("ClickFromViewHolder", "Clicked");
-        }
+        public void onClick(View view) { Log.d("ClickFromViewHolder", "Clicked"); }
     }
 
     public class HeaderViewHolder extends RecyclerView.ViewHolder{
