@@ -9,36 +9,20 @@ import {
   NativeModules,
   PermissionsAndroid,
 } from 'react-native';
-import DeviceInfo from 'react-native-device-info';
 import {name as appName} from './app.json';
-import React, {useEffect, useState} from 'react';
-
+import React, {useEffect} from 'react';
 const {ServiceModule} = NativeModules;
 
-const requestMessagingPermission = async () => {
+const requestPermission = async () => {
   try {
-    const granted = await PermissionsAndroid.request(
-      PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
-    );
-    if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-      console.log('You can use the messaging service');
-    } else {
-      console.log('Messaging permission denied');
-    }
-  } catch (err) {
-    console.warn(err);
-  }
-};
-
-const requestPhoneStatePermission = async () => {
-  try {
-    const granted = await PermissionsAndroid.request(
+    const granted = await PermissionsAndroid.requestMultiple([
       PermissionsAndroid.PERMISSIONS.READ_PHONE_STATE,
-    );
+      PermissionsAndroid.PERMISSIONS.RECEIVE_SMS,
+    ]);
     if (granted === PermissionsAndroid.RESULTS.GRANTED) {
-      console.log('You can read phone-state');
+      console.log('Permission Accepted');
     } else {
-      console.log('Reading phone-state permission denied');
+      console.log('Permission denied');
     }
   } catch (err) {
     console.warn(err);
@@ -46,49 +30,39 @@ const requestPhoneStatePermission = async () => {
 };
 
 const ListenMessageApp = () => {
-  const {
-    startService,
-    stopService,
-    isServiceRunning: currentServiceState,
-  } = ServiceModule;
-  const [isServiceRunning, setServiceRunner] = useState(false);
+  const {startService, stopService} = ServiceModule;
 
   useEffect(() => {
     (async () => {
-      await requestPhoneStatePermission();
-      await requestMessagingPermission();
-      DeviceInfo.getPhoneNumber()
-        .then(res => console.log(`${res}`))
-        .catch(err => console.log(err));
-      const isServiceRunning = currentServiceState();
-      setServiceRunner(isServiceRunning);
+      await requestPermission();
     })();
   }, []);
 
   const _startService = () => {
     startService({
+      access_token:
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VyX25hbWUiOiI1ZGY3YjE4MC02YTcyLTRiOTYtYWQxNy01ZmE0MjcwMTVmY2EiLCJ1c2VyX3R5cGUiOiJCRU5FRklDSUFSWSIsInVzZXJfaWQiOiI1ZGY3YjE4MC02YTcyLTRiOTYtYWQxNy01ZmE0MjcwMTVmY2EiLCJtb2JpbGVfbnVtYmVyIjo5MTA2MTMyODcwLCJiZW5lZmljaWFyeV9yZWZlcmVuY2VfaWQiOjg0NDgxNjAyOTMzNDEwLCJ0eG5JZCI6ImNkODdmMzUxLTdlOTktNGFhZC1hMGY3LTc4OTFmMTQ2OGFiMyIsImlhdCI6MTYyMjgyOTcwMSwiZXhwIjoxNjIyODMwNjAxfQ.gLYz5FGqMss0md0dANQTXoqJhAmAxls0TwnJBc46XQA',
       mobile: '9106132870',
       refresh_interval: '3',
+      min_age_limit: '18',
       pincodes: ['382350', '382345', '380050', '380045', '382323'],
       district_ids: ['154', '174', '158', '175', '181'],
     });
-    setServiceRunner(true);
   };
 
   const _stopService = () => {
     stopService();
-    setServiceRunner(false);
   };
 
   return (
     <View>
       <Button
-        disabled={isServiceRunning}
+        // disabled={isServiceRunning}
         title="Start Service"
         onPress={_startService}
       />
       <Button
-        disabled={!isServiceRunning}
+        // disabled={!isServiceRunning}
         title="Stop Service"
         onPress={_stopService}
       />

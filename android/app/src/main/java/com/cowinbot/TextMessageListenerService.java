@@ -1,26 +1,34 @@
-package com.example.cowintest;
+package com.cowinbot;
 
 import android.app.Notification;
 import android.app.PendingIntent;
 import android.app.Service;
-import android.app.job.JobInfo;
-import android.app.job.JobScheduler;
-import android.content.ComponentName;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Color;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.IBinder;
-import android.os.PersistableBundle;
+import android.provider.Telephony;
+import android.telephony.SmsMessage;
 import android.util.Log;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
+import androidx.work.BackoffPolicy;
+import androidx.work.Constraints;
 import androidx.work.Data;
+import androidx.work.ExistingPeriodicWorkPolicy;
+import androidx.work.NetworkType;
 import androidx.work.PeriodicWorkRequest;
 import androidx.work.WorkManager;
-import androidx.work.WorkRequest;
 
+import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.RequestQueue;
 import com.android.volley.Response;
@@ -28,6 +36,7 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 
+import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -35,104 +44,233 @@ import org.json.JSONObject;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.Objects;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
-import static com.example.cowintest.MainApplication.CHANNEL_ID;
+import static com.cowinbot.MainApplication.NOTIFICATION_INFO_CHANNEL_ID;
+import static com.cowinbot.MainApplication.NOTIFICATION_SERVICE_CHANNEL_ID;
 
 public class TextMessageListenerService extends Service {
   private final String cowin_base_url = "https://cdn-api.co-vin.in/api";
   private JSONObject userSharedPreferences = new JSONObject();
-  private ScheduledExecutorService threadPool;
-  private final int jobSchedulerId = 910613287;
+  private static final String WORKER_TAG_SYNC_DATA = "CowinWorkManager";
+  private static final String SYNC_DATA_WORK_NAME = "CowinRefreshTokenWork";
+  private static ScheduledExecutorService threadPool;
+  private static NetworkInfo activeNetworkInfo;
   private RequestQueue requestQueue;
   private WorkManager workManager;
-  private WorkRequest workRequest;
+  private PeriodicWorkRequest workRequest;
+  private BroadcastReceiver messageReceiver;
+  private NotificationManagerCompat notificationManagerCompat;
+  static ScheduledFuture<?> t;
+  private static String isPreviousNetworkStatusConnected;
 
   @Override
   public void onCreate() {
     super.onCreate();
+    notificationManagerCompat = NotificationManagerCompat.from(this);
+    requestQueue = Volley.newRequestQueue(this);
   }
 
   @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
     Toast.makeText(this, "Service running", Toast.LENGTH_SHORT).show();
-    showNotification();
     try {
-      requestQueue = Volley.newRequestQueue(this);
       userSharedPreferences = new JSONObject(Objects.requireNonNull(intent.getStringExtra("preferences")));
-      Log.d("Preferences", userSharedPreferences.toString());
-      startWorkManager();
-      // scheduleJob();
-      final long refresh_interval = Long.parseLong(userSharedPreferences.getString("refresh_interval"));
-      threadPool = Executors.newScheduledThreadPool(10);
-      final JSONArray pincodes = userSharedPreferences.getJSONArray("pincodes");
-      final JSONArray districtIds = userSharedPreferences.getJSONArray("district_ids");
-      for (int i = 0; i < pincodes.length(); ++i) threadPool.scheduleWithFixedDelay(new FindVaccineAvailability(true, pincodes.getString(i)), 0, refresh_interval, TimeUnit.SECONDS);
-      for (int i = 0; i < districtIds.length(); ++i) threadPool.scheduleWithFixedDelay(new FindVaccineAvailability(false, districtIds.getString(i)), 0, refresh_interval, TimeUnit.SECONDS);
+      // setCowinToken(userSharedPreferences.getString("access_token"));
+      registerBroadcastReceiver();
     } catch (JSONException e) {
       e.printStackTrace();
-      Log.d("Error", e.toString());
-      stopForeground(true);
-      stopSelf();
+      stopService();
     }
     return START_REDELIVER_INTENT;
+  }
+
+  private void registerBroadcastReceiver(){
+    isPreviousNetworkStatusConnected = "";
+    final IntentFilter intentFilter = new IntentFilter();
+    intentFilter.setPriority(IntentFilter.SYSTEM_HIGH_PRIORITY);
+    intentFilter.addAction(Telephony.Sms.Intents.SMS_RECEIVED_ACTION);
+    intentFilter.addAction(ConnectivityManager.CONNECTIVITY_ACTION);
+    this.messageReceiver = new BroadcastReceiver() {
+      @Override
+      public void onReceive(Context context, Intent intent) {
+        if(context == null || intent == null || intent.getAction() == null) return;
+        switch (intent.getAction()){
+          case ConnectivityManager.CONNECTIVITY_ACTION: {
+            Log.d("Connectivity Manager", "Connectivity Changed");
+            ConnectivityManager connectivityManager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+            activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+            final String isNetworkStatusConnected = String.valueOf(isNetworkConnected() && internetIsConnected());
+            if(isNetworkStatusConnected == isPreviousNetworkStatusConnected) return;
+            isPreviousNetworkStatusConnected = isNetworkStatusConnected;
+            try {
+              if (Boolean.parseBoolean(isNetworkStatusConnected)) {
+                sendForegroundNotification("It is working");
+                startBotActivity();
+              } else {
+                sendForegroundNotification("Internet Connectivity is Gone");
+                stopBotActivity();
+              }
+            } catch (JSONException e) {
+              e.printStackTrace();
+            }
+            break;
+          }
+          case Telephony.Sms.Intents.SMS_RECEIVED_ACTION: {
+            SmsMessage[] textMessages = Telephony.Sms.Intents.getMessagesFromIntent(intent);
+            for (int i = 0; i < textMessages.length; i++) {
+              Log.d("Text Message Address", textMessages[i].getOriginatingAddress());
+              Log.d("Text Message Body", textMessages[i].getMessageBody());
+              final String originatingAddress = textMessages[i].getOriginatingAddress();
+              final String messageBody = textMessages[i].getMessageBody();
+              if (originatingAddress.contains("NHPSMS") && messageBody.contains("Your OTP to register/access CoWIN is")) {
+                String otp = messageBody.split(" ")[6].substring(0, 6);
+                Log.d("MessageListenerService", "OTP is: " + otp);
+                Toast.makeText(context, ("OTP is: " + otp), Toast.LENGTH_SHORT).show();
+                confirmOTP(otp);
+              }
+            }
+            break;
+          }
+        }
+      }
+    };
+    this.registerReceiver(this.messageReceiver, intentFilter);
+  }
+
+  public boolean internetIsConnected() {
+    try {
+      String command = "ping -c 1 google.com";
+      return (Runtime.getRuntime().exec(command).waitFor() == 0);
+    } catch (Exception e) {
+      return false;
+    }
+  }
+
+  private boolean isNetworkConnected(){
+    if(activeNetworkInfo == null) return false;
+    return activeNetworkInfo.isConnected();
   }
 
   private class FindVaccineAvailability implements Runnable{
     private final Boolean is_pincode;
     private final String param;
-
     FindVaccineAvailability(Boolean firstIsPincode, String firstParam){
       is_pincode = firstIsPincode;
       param = firstParam;
     }
-
     @Override
     public void run() {
-      Log.d("FindVaccineAvailability", "Checking Availability Slot...");
       findAvailableSlot(is_pincode, param);
     }
   }
 
-  private void showNotification(){
+  private void sendForegroundNotification(final String contentText){
     Intent notificationIntent = new Intent(this, MainActivity.class);
     PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
     Intent broadcastIntent = new Intent(this, NotificationReceiver.class);
     broadcastIntent.putExtra("toastMessage", "The service has been stopped successfully");
     PendingIntent actionIntent = PendingIntent.getBroadcast(this, 0, broadcastIntent, PendingIntent.FLAG_UPDATE_CURRENT);
-    Notification notification = new NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.drawable.ic_android)
-            .setContentTitle("Foreground Service")
-            .setContentText("It is working")
-            .setColor(Color.BLUE)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setOnlyAlertOnce(true)
-            .addAction(R.mipmap.ic_launcher, "Stop", actionIntent)
-            .build();
+    Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_SERVICE_CHANNEL_ID)
+      .setSmallIcon(R.drawable.ic_notification_logo)
+      .setContentTitle("Foreground Service")
+      .setContentText(contentText)
+      .setColor(Color.argb(1,66,133,244))
+      .setPriority(NotificationCompat.PRIORITY_MAX)
+      .setCategory(NotificationCompat.CATEGORY_SERVICE)
+      .setContentIntent(pendingIntent)
+      .setAutoCancel(true)
+      .setOnlyAlertOnce(true)
+      .addAction(R.mipmap.ic_launcher, "Stop", actionIntent)
+      .build();
     startForeground(1, notification);
+  }
+
+  private void sendInformationNotification(){
+    Notification notification = new NotificationCompat.Builder(this, NOTIFICATION_INFO_CHANNEL_ID)
+      .setSmallIcon(R.drawable.ic_notification_logo)
+      .setContentTitle("CoWIN Bot")
+      .setContentText("Congratulations!! Your vaccination slot has been registered successfully.")
+      .setColor(Color.BLUE)
+      .setPriority(NotificationCompat.PRIORITY_MAX)
+      .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+      .setAutoCancel(true)
+      .setOnlyAlertOnce(true)
+      .build();
+    notificationManagerCompat.notify(2, notification);
+  }
+
+  private void confirmOTP(String otp) {
+    String url = cowin_base_url + "/v2/auth/validateMobileOtp";
+    final String _txnId = getCowinTxnId();
+    Map<String, String> params = new HashMap();
+    params.put("otp", DigestUtils.sha256Hex(otp));
+    params.put("txnId", _txnId);
+    JSONObject parameters = new JSONObject(params);
+    JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, parameters, new Response.Listener<JSONObject>() {
+      @Override
+      public void onResponse(JSONObject response) {
+        try {
+          setCowinToken(response.getString("token"));
+          Log.d("OTP Confirmation Token", response.getString("token"));
+        } catch (JSONException e) {
+          e.printStackTrace();
+        }
+      }
+    }, new Response.ErrorListener() {
+      @Override
+      public void onErrorResponse(VolleyError error) {
+        error.printStackTrace();
+        Log.d("Confirm OTP Error", "That didn't work!!");
+      }
+    }){
+      @Override
+      public Map<String, String> getHeaders () throws AuthFailureError {
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("Origin", "https://selfregistration.cowin.gov.in"); // Just to make cowin's backend API happy and so to get some response but no Timeout Error.... Any base_url on the internet can be written here, even the local urls(http://localhost:<port>).
+        return params;
+      }
+    };
+    requestQueue.add(jsonObjectRequest);
   }
 
   private void findAvailableSlot(Boolean is_pincode, String param){
     String url = cowin_base_url + "/v2/appointment/sessions/public/";
-    url += (is_pincode ? "calendarByPin?pincode=" : "calendarByDistrict?district_id=") + param + ("&date=" + getCurrentDate());
+    url += (is_pincode ? "calendarByPin?pincode=" : "calendarByDistrict?district_id=") + param + ("&date=" + getTomorrowDate());
     JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.GET, url, null, new Response.Listener<JSONObject>() {
       @Override
       public void onResponse(JSONObject response) {
         try {
           final JSONArray centers = response.getJSONArray("centers");
-          // Log.d("Centers", centers.toString());
           for (int i = 0; i < centers.length(); ++i) {
             final JSONObject center = centers.getJSONObject(i);
             final JSONArray sessions = center.getJSONArray("sessions");
             for (int j = 0; j < sessions.length(); ++j) {
               final JSONObject session = sessions.getJSONObject(j);
-              checkVaccineAvailability(session);
+              if (checkVaccineAvailability(session) && isBotActivityRunning()) {
+                // stopBotActivity();
+                Log.d("Separator", "--------------------------------------------------------------------");
+                Log.d("This slot is Available", session.toString());
+                final String sessionId = session.getString("session_id");
+                String preferredSlot = session.getJSONArray("slots").length() > 0 ? session.getJSONArray("slots").getString(0) : "";
+                final int dose = 1;
+                final int centerId = center.getInt("center_id");
+                final JSONArray beneficiaries = new JSONArray();
+                beneficiaries.put("84481602933410");
+                final JSONObject parameters = new JSONObject();
+                parameters.put("center_id", centerId);
+                parameters.put("dose", dose);
+                parameters.put("session_id", sessionId);
+                parameters.put("slot", preferredSlot);
+                parameters.put("beneficiaries", beneficiaries);
+                // bookSlot(parameters);
+              }
             }
           }
         } catch (JSONException e) {
@@ -148,8 +286,8 @@ public class TextMessageListenerService extends Service {
     requestQueue.add(jsonObjectRequest);
   }
 
-  private Boolean checkVaccineAvailability(JSONObject session) {
-    // Log.d("Session", session.toString());
+  private Boolean checkVaccineAvailability(JSONObject session) throws JSONException {
+    if(session.getInt("available_capacity") > 0 && session.getInt("available_capacity_dose1") > 0 && session.getInt("min_age_limit") == 18) return true;
     return false;
   }
 
@@ -158,60 +296,142 @@ public class TextMessageListenerService extends Service {
     return preferences.getString("token", "");
   }
 
-  private void bookSlot(){
-    final String token = getCowinToken();
-    Log.d("Device Token", token);
+  private String getCowinTxnId(){
+    SharedPreferences preferences = getSharedPreferences("COWIN", MODE_PRIVATE);
+    return preferences.getString("txnId", "");
   }
 
-  private String getCurrentDate(){
-    Date date = Calendar.getInstance().getTime();
+  private void setCowinToken(final String token) {
+    SharedPreferences.Editor editor = getSharedPreferences("COWIN", MODE_PRIVATE).edit();
+    editor.putString("token", token);
+    editor.apply();
+  }
+
+  private void bookSlot(JSONObject parameters) {
+    Log.d("CoWIN Token", getCowinToken());
+    Log.d("Separator", "--------------------------------------------------------------------");
+    // Log.d("Slot booking parameters", parameters.toString());
+    String url = cowin_base_url + "/v2/appointment/schedule";
+    final String token = getCowinToken();
+    JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, parameters, new Response.Listener<JSONObject>() {
+      @Override
+      public void onResponse(JSONObject response) {
+        Log.d("Last Message of the day", response.toString());
+        sendInformationNotification();
+        stopForeground(true);
+        stopSelf();
+      }
+    }, new Response.ErrorListener() {
+      @Override
+      public void onErrorResponse(VolleyError error) {
+        error.printStackTrace();
+        Log.d("Last Error", error.toString());
+        Log.d("Last Error Message", "That didn't work!!");
+        // startThreadPool();
+        // if(error != null && error.networkResponse != null){ if(error.networkResponse.statusCode == 400){ } }
+      }
+    }){
+      @Override
+      public Map<String, String> getHeaders () throws AuthFailureError {
+        Map<String, String> params = new HashMap<String, String>();
+        params.put("Content-Type", "application/json; charset=UTF-8");
+        params.put("Authorization", "Bearer ".concat(token));
+        return params;
+      }
+    };
+    requestQueue.add(jsonObjectRequest);
+  }
+
+  private String getTomorrowDate(){
+    Date date = new Date();
+    Calendar c = Calendar.getInstance();
+    c.setTime(date);
+    c.add(Calendar.DATE, 1);
+    date = c.getTime();
     SimpleDateFormat formatter = new SimpleDateFormat("dd-MM-yyyy");
     return formatter.format(date);
   }
 
-  public void scheduleJob() throws JSONException {
-    PersistableBundle bundle = new PersistableBundle();
-    bundle.putString("mobile", userSharedPreferences.getString("mobile"));
-    ComponentName componentName = new ComponentName(this, RefreshTokenJobService.class);
-    JobInfo info = new JobInfo.Builder(jobSchedulerId, componentName)
-            .setRequiresCharging(true)
-            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_UNMETERED)
-            .setPersisted(true)
-            .setPeriodic(16 * 60 * 1000)
-            .setExtras(bundle)
-            .build();
-    JobScheduler scheduler = (JobScheduler) getSystemService(JOB_SCHEDULER_SERVICE);
-    scheduler.cancelAll();
-    int resultCode = scheduler.schedule(info);
-    if (resultCode == JobScheduler.RESULT_SUCCESS) {
-      Log.d("Job Scheduler", "Job scheduled");
-    } else {
-      Log.d("Job Scheduler", "Job scheduling failed");
-    }
-  }
-
-  public void cancelJob() {
-    JobScheduler scheduler = (JobScheduler) getSystemService(JOB_SCHEDULER_SERVICE);
-    scheduler.cancel(jobSchedulerId);
-    Log.d("Job Scheduler", "Job cancelled");
-  }
-
   public void startWorkManager() throws JSONException {
+    final Data data = new Data.Builder().putString("mobile", userSharedPreferences.getString("mobile")).build();
+    final Constraints constraints = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
+    workRequest = new PeriodicWorkRequest.Builder(RefreshTokenWorkManager.class, 19, TimeUnit.MINUTES)
+      .setInputData(data)
+      .setConstraints(constraints)
+      .addTag(WORKER_TAG_SYNC_DATA)
+      .setBackoffCriteria(BackoffPolicy.LINEAR, PeriodicWorkRequest.MIN_BACKOFF_MILLIS, TimeUnit.MILLISECONDS)
+      .build();
     workManager = WorkManager.getInstance(this);
-    workRequest = new PeriodicWorkRequest.Builder(RefreshTokenWorkManager.class, 19, TimeUnit.MINUTES).setInputData(new Data.Builder().putString("mobile", userSharedPreferences.getString("mobile")).build()).build();
-    workManager.enqueue(workRequest);
+    workManager.enqueueUniquePeriodicWork(SYNC_DATA_WORK_NAME, ExistingPeriodicWorkPolicy.REPLACE, workRequest);
   }
 
   public void stopWorkManager(){
-    workManager.cancelWorkById(workRequest.getId());
+    // workManager.cancelWorkById(workRequest.getId());
+    // workManager.cancelAllWorkByTag(WORKER_TAG_SYNC_DATA);
+    workManager.cancelAllWork();
+    workManager = null;
+  }
+
+  private void unregisterBroadcastReceiver(){
+    try {
+      isPreviousNetworkStatusConnected = "";
+      this.unregisterReceiver(this.messageReceiver);
+    } catch (IllegalArgumentException e){
+      Log.d("Broadcast Listener", "Error occurred when unregistering BroadcastReceiver");
+    }
+  }
+
+  private void startThreadPool() throws JSONException {
+    final long refresh_interval = Long.parseLong(userSharedPreferences.getString("refresh_interval"));
+    final JSONArray pincodes = userSharedPreferences.getJSONArray("pincodes");
+    final JSONArray districtIds = userSharedPreferences.getJSONArray("district_ids");
+    final int corePoolSize = pincodes.length() + districtIds.length();
+    threadPool = Executors.newScheduledThreadPool(corePoolSize);
+    for (int i = 0; i < pincodes.length(); ++i) t = threadPool.scheduleWithFixedDelay(new FindVaccineAvailability(true, pincodes.getString(i)), 0, refresh_interval, TimeUnit.SECONDS);
+    for (int i = 0; i < districtIds.length(); ++i) t = threadPool.scheduleWithFixedDelay(new FindVaccineAvailability(false, districtIds.getString(i)), 0, refresh_interval, TimeUnit.SECONDS);
+  }
+
+  private void stopThreadPool(){
+    t.cancel(true); // Just to increase the probability/possibility of interrupting the Thread Pool to stop the parallel execution...
+    threadPool.shutdownNow();
+  }
+
+  private void startBotActivity() throws JSONException {
+    startWorkManager();
+    startThreadPool();
+  }
+
+  private boolean isBotActivityRunning(){
+    return isWorkScheduled() && isThreadPoolScheduled();
+  }
+
+  private void stopBotActivity() {
+    // Log.d("isWorkScheduled", "" + isWorkScheduled());
+    // Log.d("isThreadPoolScheduled",  "" + isThreadPoolScheduled());
+    if(isWorkScheduled()) stopWorkManager();
+    if(isThreadPoolScheduled()) stopThreadPool();
+  }
+
+  private boolean isThreadPoolScheduled(){
+    if(threadPool == null) return false;
+    return !threadPool.isTerminated();
+  }
+
+  private boolean isWorkScheduled() {
+    if(workManager == null) return false;
+    return true; // Not the best practice, but couldn't find anything else on the internet...
+  }
+
+  private void stopService(){
+    stopForeground(true);
+    stopSelf();
   }
 
   @Override
   public void onDestroy() {
     super.onDestroy();
-    // cancelJob();
-    stopWorkManager();
-    threadPool.shutdownNow();
+    unregisterBroadcastReceiver();
+    stopBotActivity();
     Toast.makeText(this, "The service has been stopped successfully", Toast.LENGTH_SHORT).show();
   }
 

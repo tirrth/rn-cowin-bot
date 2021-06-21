@@ -1,14 +1,8 @@
 package com.cowinbot;
 
-import android.app.Activity;
-import android.app.AlertDialog;
-import android.content.BroadcastReceiver;
 import android.content.Context;
-import android.content.DialogInterface;
 import android.content.Intent;
-import android.util.Log;
-import android.view.View;
-import android.widget.Toast;
+import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -24,8 +18,6 @@ import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.Map;
-
 public class ServiceModule extends ReactContextBaseJavaModule {
     ServiceModule(ReactApplicationContext context) {
         super(context);
@@ -39,8 +31,6 @@ public class ServiceModule extends ReactContextBaseJavaModule {
 
     @ReactMethod
     public void startService(ReadableMap preferences) throws JSONException {
-        // final String mobile = preferences.getString("mobile");
-        // Log.d("Mobile Number", mobile);
         Intent serviceIntent = new Intent(getCurrentActivity(), TextMessageListenerService.class);
         serviceIntent.putExtra("preferences", convertMapToJson(preferences).toString());
         ContextCompat.startForegroundService(getCurrentActivity(), serviceIntent);
@@ -102,13 +92,21 @@ public class ServiceModule extends ReactContextBaseJavaModule {
     }
 
     @ReactMethod
-    public Boolean isServiceRunning(){
-        return !TextMessageListenerService._stop;
-    }
-
-    @ReactMethod
     public void stopService() {
         Intent serviceIntent = new Intent(getCurrentActivity(), TextMessageListenerService.class);
         getCurrentActivity().stopService(serviceIntent);
+    }
+
+    @ReactMethod
+    public String getCowinToken(){
+        SharedPreferences preferences = getReactApplicationContext().getSharedPreferences("COWIN", Context.MODE_PRIVATE);
+        return preferences.getString("token", "");
+    }
+
+    @ReactMethod
+    public void setCowinToken(String token){
+        SharedPreferences.Editor editor = getReactApplicationContext().getSharedPreferences("COWIN", Context.MODE_PRIVATE).edit();
+        editor.putString("token", token);
+        editor.apply();
     }
 }
