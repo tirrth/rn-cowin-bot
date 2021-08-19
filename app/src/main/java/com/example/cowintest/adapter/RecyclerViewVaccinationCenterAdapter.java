@@ -109,33 +109,41 @@ import java.util.List;
 
 
 public class RecyclerViewVaccinationCenterAdapter extends RecyclerView.Adapter<RecyclerViewVaccinationCenterAdapter.ViewHolder> {
-    private List<VaccinationCenterModel> centerList;
-    private OnVaccinationCenterListener mOnVaccinationCenterListener;
+    public List<VaccinationCenterModel> centerList;
+    // private OnVaccinationCenterListener mOnVaccinationCenterListener;
+    private boolean _isSelectAll = false;
 
-    public RecyclerViewVaccinationCenterAdapter(List<VaccinationCenterModel> centerList, OnVaccinationCenterListener onVaccinationCenterListener) {
+    // public RecyclerViewVaccinationCenterAdapter(List<VaccinationCenterModel> centerList, OnVaccinationCenterListener onVaccinationCenterListener) {
+    //     this.centerList = centerList;
+    //     this.mOnVaccinationCenterListener = onVaccinationCenterListener;
+    // }
+
+    public RecyclerViewVaccinationCenterAdapter(List<VaccinationCenterModel> centerList) {
         this.centerList = centerList;
-        this.mOnVaccinationCenterListener = onVaccinationCenterListener;
     }
 
     @NonNull
     @Override
     public ViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext()).inflate(R.layout.center_list_card, parent, false);
-        return new ViewHolder(view, mOnVaccinationCenterListener);
+        // return new ViewHolder(view, mOnVaccinationCenterListener);
+        return new ViewHolder(view);
     }
 
     @Override
     public void onBindViewHolder(@NonNull ViewHolder holder, int position) {
         try {
             final VaccinationCenterModel center = centerList.get(position);
+            if(_isSelectAll) center.setSelected(true);
             final ViewHolder itemViewHolder = (ViewHolder) holder;
             itemViewHolder.centerName.setText(center.getName());
             itemViewHolder.centerAddress.setText(" - ".concat(center.getAddress()));
-            holder.itemView.setBackgroundColor(holder.itemView.isSelected() ? Color.CYAN : Color.WHITE);
+            holder.itemView.setBackgroundColor(center.isSelected() ? Color.argb(50, 66, 133, 244) : Color.WHITE);
             holder.itemView.setOnClickListener(view -> {
+                // if(_isSelectAll) _isSelectAll = false;
                 center.setSelected(!center.isSelected());
-                holder.itemView.setBackgroundColor(center.isSelected() ? Color.CYAN : Color.WHITE);
-                mOnVaccinationCenterListener.onVaccinationCenterClick(position, centerList.get(position));
+                holder.itemView.setBackgroundColor(center.isSelected() ? Color.argb(50, 66, 133, 244) : Color.WHITE);
+                // mOnVaccinationCenterListener.onVaccinationCenterClick(position, centerList.get(position));
             });
         } catch (NullPointerException e){
             e.printStackTrace();
@@ -149,17 +157,35 @@ public class RecyclerViewVaccinationCenterAdapter extends RecyclerView.Adapter<R
 
     public class ViewHolder extends RecyclerView.ViewHolder {
         TextView centerName, centerAddress;
-        OnVaccinationCenterListener mOnVaccinationCenterListener;
+        // OnVaccinationCenterListener mOnVaccinationCenterListener;
 
-        public ViewHolder(View itemView, OnVaccinationCenterListener onNoteListener) {
+        // public ViewHolder(View itemView, OnVaccinationCenterListener onNoteListener) {
+        //     super(itemView);
+        //     centerName = itemView.findViewById(R.id.centerName);
+        //     centerAddress = itemView.findViewById(R.id.centerAddress);
+        //     mOnVaccinationCenterListener = onNoteListener;
+        // }
+
+        public ViewHolder(View itemView) {
             super(itemView);
             centerName = itemView.findViewById(R.id.centerName);
             centerAddress = itemView.findViewById(R.id.centerAddress);
-            mOnVaccinationCenterListener = onNoteListener;
         }
     }
 
-    public interface OnVaccinationCenterListener{
-        void onVaccinationCenterClick(int position, VaccinationCenterModel selectedCenter);
+    public void setIsSelectAll(final boolean _isSelectAll){
+        this._isSelectAll = _isSelectAll;
+        for(int i = 0; i < getItemCount(); i++){
+            centerList.get(i).setSelected(_isSelectAll);
+        }
+        notifyDataSetChanged();
     }
+
+    public boolean isSelectAll(){
+        return _isSelectAll;
+    }
+
+    // public interface OnVaccinationCenterListener{
+    //     void onVaccinationCenterClick(int position, VaccinationCenterModel selectedCenter);
+    // }
 }

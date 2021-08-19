@@ -1,49 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.constraintlayout.widget.ConstraintLayout  xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
-    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content">
-<!--    <LinearLayout-->
-<!--        android:layout_width="match_parent"-->
-<!--        android:layout_height="wrap_content"-->
-<!--        android:orientation="horizontal">-->
-<!--        <com.google.android.material.textfield.TextInputLayout-->
-<!--            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"-->
-<!--            android:id="@+id/textInputMobileLayout3"-->
-<!--            android:layout_width="0dp"-->
-<!--            android:layout_height="wrap_content"-->
-<!--            android:layout_gravity="center_vertical"-->
-<!--            android:layout_weight="1"-->
-<!--            app:endIconMode="custom"-->
-<!--            app:endIconDrawable="@drawable/ic_search"-->
-<!--            app:endIconCheckable="true"-->
-<!--            app:endIconTintMode="src_atop"-->
-<!--            app:layout_constraintBottom_toBottomOf="parent"-->
-<!--            app:layout_constraintEnd_toEndOf="parent"-->
-<!--            app:layout_constraintStart_toStartOf="parent"-->
-<!--            android:layout_marginHorizontal="20dp"-->
-<!--            app:layout_constraintTop_toTopOf="parent">-->
-<!--            <com.google.android.material.textfield.TextInputEditText-->
-<!--                android:layout_width="match_parent"-->
-<!--                android:layout_height="wrap_content"-->
-<!--                android:hint="Enter your Mobile Number"-->
-<!--                android:maxLength="10"-->
-<!--                android:inputType="phone"-->
-<!--            />-->
-<!--        </com.google.android.material.textfield.TextInputLayout>-->
-<!--&lt;!&ndash;        <ImageView&ndash;&gt;-->
-<!--&lt;!&ndash;            android:background="?attr/selectableItemBackgroundBorderless"&ndash;&gt;-->
-<!--&lt;!&ndash;            android:contentDescription="SEARCH DISTRICT"&ndash;&gt;-->
-<!--&lt;!&ndash;            android:clickable="true"&ndash;&gt;-->
-<!--&lt;!&ndash;            android:src="@drawable/ic_add"&ndash;&gt;-->
-<!--&lt;!&ndash;            android:layout_width="wrap_content"&ndash;&gt;-->
-<!--&lt;!&ndash;            android:layout_height="wrap_content"&ndash;&gt;-->
-<!--&lt;!&ndash;            android:layout_gravity="center_vertical"&ndash;&gt;-->
-<!--&lt;!&ndash;        />&ndash;&gt;-->
-<!--    </LinearLayout>-->
-
-
     <LinearLayout
         android:id="@+id/linearLayout"
         android:layout_width="match_parent"
@@ -54,25 +13,45 @@
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintTop_toTopOf="parent">
 
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/textInputDistrictLayout"
-            style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense.ExposedDropdownMenu"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            app:boxBackgroundColor="@color/white"
-            app:boxBackgroundMode="outline"
-            app:boxStrokeColor="@color/white"
-            app:boxStrokeWidth="0dp"
-            app:endIconTint="#8d8d8d"
-            app:placeholderText="Select your District">
-
-            <AutoCompleteTextView
-                android:id="@+id/autoCompleteDistrictTextView"
-                android:layout_width="match_parent"
-                android:layout_height="match_parent"
+            android:orientation="horizontal">
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/textInputPincodeLayout"
+                style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.Dense"
+                android:layout_width="0dp"
                 android:layout_weight="1"
-                android:inputType="none" />
-        </com.google.android.material.textfield.TextInputLayout>
+                android:layout_gravity="center_vertical"
+                android:layout_height="wrap_content"
+                app:boxBackgroundColor="@color/white"
+                app:boxBackgroundMode="outline"
+                app:boxStrokeColor="@color/white"
+                app:prefixText="Enter Pincode - "
+                app:boxStrokeWidth="0dp">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:singleLine="true"
+                    android:imeOptions="actionSend"
+                    android:id="@+id/pincodeTextInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:inputType="number"
+                    android:maxLength="6"
+                />
+            </com.google.android.material.textfield.TextInputLayout>
+            <ImageView
+                android:id="@+id/searchPincodeImageView"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_gravity="center_vertical"
+                android:src="@drawable/ic_search"
+                android:contentDescription="SEARCH PINCODE"
+                android:layout_marginTop="2dp"
+                android:layout_marginHorizontal="14dp"
+            />
+        </LinearLayout>
 
         <View
             android:layout_width="match_parent"
@@ -87,7 +66,7 @@
             android:orientation="vertical">
 
             <LinearLayout
-                android:id="@+id/districtDialogInfoMessageTextView"
+                android:id="@+id/pincodeDialogInfoMessageTextView"
                 android:layout_width="match_parent"
                 android:gravity="center"
                 android:paddingHorizontal="20dp"
@@ -96,7 +75,7 @@
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:text="No District Selected"
+                    android:text="No Pincode Entered"
                     android:textStyle="bold"
                     android:textAllCaps="true"
                     android:textSize="16sp"
@@ -108,13 +87,13 @@
                     android:layout_height="wrap_content"
                     android:textAlignment="center"
                     android:textColor="#17A2B8"
-                    android:text="ⓘ Select a District, Choose your preferred centers (By default, all centers of a district will be taken as preferred and will book the slot in the first available center)"
+                    android:text="ⓘ Enter a Pincode, Choose your preferred centers (By default, all centers of given Pincode will be taken as preferred and will book the slot in the first available center)"
                     android:visibility="visible"
                 />
             </LinearLayout>
 
             <ProgressBar
-                android:id="@+id/districtDialogResourceLoader"
+                android:id="@+id/pincodeDialogResourceLoader"
                 style="?android:attr/progressBarStyle"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
@@ -136,7 +115,7 @@
 
     <LinearLayout
         android:visibility="gone"
-        android:id="@+id/districtConfigButtons"
+        android:id="@+id/pincodeConfigButtons"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
@@ -161,14 +140,14 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <LinearLayout
-                    android:id="@+id/selectAllDistrictCentersButton"
+                    android:id="@+id/selectAllPincodeCentersButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/border_button"
                     android:paddingHorizontal="18dp"
                     android:paddingVertical="8dp">
                     <TextView
-                        android:id="@+id/selectAllDistrictCentersTextView"
+                        android:id="@+id/selectAllPincodeCentersTextView"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textAlignment="center"
@@ -187,18 +166,18 @@
                 android:layout_weight="1"
                 android:orientation="vertical">
                 <LinearLayout
-                    android:id="@+id/addDistrictButton"
+                    android:id="@+id/addPincodeButton"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:background="@drawable/custom_button"
                     android:paddingHorizontal="14dp"
-                    android:layout_gravity="end"
+                    android:layout_gravity="center"
                     android:paddingVertical="8dp">
                     <TextView
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:textAlignment="center"
-                        android:text="Add District"
+                        android:text="Add Pincode"
                         android:textAllCaps="true"
                         android:textColor="@color/white"
                         android:textStyle="bold" />

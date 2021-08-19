@@ -37,6 +37,7 @@ import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 
+import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -232,7 +233,7 @@ public class TextMessageListenerService extends Service {
     String url = cowin_base_url + "/v2/auth/validateMobileOtp";
     final String _txnId = getCowinTxnId();
     Map<String, String> params = new HashMap();
-    params.put("otp", DigestUtils.sha256Hex(otp));
+    params.put("otp", new String(Hex.encodeHex(DigestUtils.sha256(otp))));
     params.put("txnId", _txnId);
     JSONObject parameters = new JSONObject(params);
     JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(Request.Method.POST, url, parameters, new Response.Listener<JSONObject>() {
